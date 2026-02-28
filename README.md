@@ -11,9 +11,9 @@ ShizukuPlus-API eliminates the boilerplate associated with standard Shizuku deve
 *   **Dhizuku (Device Owner) Integration**: Directly access the `DevicePolicyManager` binder without requiring the user to perform a factory reset or complex ADB setup.
 *   **Universal Compatibility**: Automatically detects if the server is Shizuku+ or standard Shizuku. It uses optimized paths for Shizuku+ and provides a transparent fallback (via `SafeShell`) for original Shizuku servers.
 
-## 🚀 Advanced System APIs (2026)
+## 🚀 Plus API Features
 
-ShizukuPlus-API includes foundational support for 2026-era Android features (Android 16/17+):
+ShizukuPlus-API includes exclusive interfaces for advanced system interaction:
 
 ### 1. AVF (Virtual Machine) Manager
 Manage isolated Linux environments via the Android Virtualization Framework.
@@ -31,7 +31,7 @@ Access privileged system intelligence and hardware accelerators.
 *   **Use Case**: Advanced automation and context-aware accessibility tools.
 
 ### 4. Window Manager Plus (Desktop Mode)
-Take control of the Android 16/17 desktop windowing experience.
+Take control of the desktop windowing experience.
 *   **Capabilities**: Force free-form resizing, manage the system "Bubble Bar," and set "Always on Top" windows.
 
 ### 5. Continuity Bridge
@@ -90,7 +90,7 @@ ParcelFileDescriptor pfd = storage.openFile("/data/data/com.example.app/files/co
 
 ShizukuPlus-API is built on a **Translation Layer**. 
 
-*   **On Shizuku+**: Uses optimized Binder transactions for maximum speed and access to Advanced System APIs.
+*   **On Shizuku+**: Uses optimized Binder transactions for maximum speed and access to exclusive Plus APIs.
 *   **On standard Shizuku**: Automatically wraps commands into `Shizuku.newProcess` shell scripts behind the scenes. 
 
 **Result**: Your app works everywhere, but runs better on Shizuku+.
