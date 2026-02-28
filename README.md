@@ -11,7 +11,7 @@ ShizukuPlus-API eliminates the boilerplate associated with standard Shizuku deve
 *   **Dhizuku (Device Owner) Integration**: Directly access the `DevicePolicyManager` binder without requiring the user to perform a factory reset or complex ADB setup.
 *   **Universal Compatibility**: Automatically detects if the server is Shizuku+ or standard Shizuku. It uses optimized paths for Shizuku+ and provides a transparent fallback (via `SafeShell`) for original Shizuku servers.
 
-## 🚀 2026 Strategic API Extensions
+## 🚀 Advanced System APIs (2026)
 
 ShizukuPlus-API includes foundational support for 2026-era Android features (Android 16/17+):
 
@@ -90,7 +90,7 @@ ParcelFileDescriptor pfd = storage.openFile("/data/data/com.example.app/files/co
 
 ShizukuPlus-API is built on a **Translation Layer**. 
 
-*   **On Shizuku+**: Uses optimized Binder transactions for maximum speed and access to 2026 Strategic APIs.
+*   **On Shizuku+**: Uses optimized Binder transactions for maximum speed and access to Advanced System APIs.
 *   **On standard Shizuku**: Automatically wraps commands into `Shizuku.newProcess` shell scripts behind the scenes. 
 
 **Result**: Your app works everywhere, but runs better on Shizuku+.
