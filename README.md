@@ -34,7 +34,22 @@ Access privileged system intelligence and hardware accelerators.
 Take control of the desktop windowing experience.
 *   **Capabilities**: Force free-form resizing, manage the system "Bubble Bar," and set "Always on Top" windows.
 
-### 5. Continuity Bridge
+### 5. System Theming Bridge (Overlay Manager Plus)
+Expose privileged overlay management.
+*   **Capabilities**: Enable/disable system UI overlays without root.
+*   **Use Case**: Rootless theming engines (like Hex Installer).
+
+### 6. Network & DNS Governor
+Manage network restrictions and routing.
+*   **Capabilities**: Set system-wide Private DNS and manage iptables rules via routing/VPN.
+*   **Use Case**: Rootless ad-blockers (AdAway) and firewalls (AFWall+).
+
+### 7. Deep Process Control (Activity Manager Plus)
+Advanced memory and process management.
+*   **Capabilities**: Deeply kill background apps and manage standby buckets.
+*   **Use Case**: Performance optimizers (Thanox, 3C Toolbox).
+
+### 8. Continuity Bridge
 Seamless multi-device state synchronization.
 *   **Capabilities**: Sync app states and privileged task handoffs between devices running ShizukuPlus.
 

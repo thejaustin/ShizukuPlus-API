@@ -8,6 +8,9 @@ import moe.shizuku.server.IStorageProxy;
 import moe.shizuku.server.IAICorePlus;
 import moe.shizuku.server.IWindowManagerPlus;
 import moe.shizuku.server.IContinuityBridge;
+import moe.shizuku.server.IOverlayManagerPlus;
+import moe.shizuku.server.INetworkGovernorPlus;
+import moe.shizuku.server.IActivityManagerPlus;
 
 interface IShizukuService {
 
@@ -62,4 +65,10 @@ interface IShizukuService {
     IContinuityBridge getContinuityBridge() = 111;
 
     void updatePlusFeatureEnabled(String key, boolean enabled) = 112;
+
+    IOverlayManagerPlus getOverlayManagerPlus() = 113;
+
+    INetworkGovernorPlus getNetworkGovernorPlus() = 114;
+
+    IActivityManagerPlus getActivityManagerPlus() = 115;
  }
