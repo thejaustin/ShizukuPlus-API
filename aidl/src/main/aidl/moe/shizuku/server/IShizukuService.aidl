@@ -60,4 +60,6 @@ interface IShizukuService {
     IWindowManagerPlus getWindowManagerPlus() = 110;
 
     IContinuityBridge getContinuityBridge() = 111;
+
+    void updatePlusFeatureEnabled(String key, boolean enabled) = 112;
  }

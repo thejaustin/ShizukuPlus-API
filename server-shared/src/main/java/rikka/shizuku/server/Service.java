@@ -303,8 +303,7 @@ public abstract class Service<
         return entry != null && entry.isDenied();
     }
 
-    @Override
-    public IRemoteProcess newProcess(String[] cmd, String[] env, String dir) {
+    public IRemoteProcess newProcessInternal(String[] cmd, String[] env, String dir) {
         enforceCallingPermission("newProcess");
 
         LOGGER.d("newProcess: uid=%d, cmd=%s, env=%s, dir=%s", Binder.getCallingUid(), Arrays.toString(cmd), Arrays.toString(env), dir);
