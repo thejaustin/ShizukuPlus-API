@@ -304,7 +304,7 @@ public abstract class Service<
     }
 
     @Override
-    public final IRemoteProcess newProcess(String[] cmd, String[] env, String dir) {
+    public IRemoteProcess newProcess(String[] cmd, String[] env, String dir) {
         enforceCallingPermission("newProcess");
 
         LOGGER.d("newProcess: uid=%d, cmd=%s, env=%s, dir=%s", Binder.getCallingUid(), Arrays.toString(cmd), Arrays.toString(env), dir);
@@ -320,6 +320,10 @@ public abstract class Service<
         IBinder token = clientRecord != null ? clientRecord.client.asBinder() : null;
 
         return new RemoteProcessHolder(process, token);
+    }
+
+    public boolean checkPlusFeatureEnabled(String key) {
+        return true;
     }
 
     @CallSuper
