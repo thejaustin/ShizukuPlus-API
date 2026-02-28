@@ -3,6 +3,8 @@ package moe.shizuku.server;
 import moe.shizuku.server.IRemoteProcess;
 import moe.shizuku.server.IShizukuApplication;
 import moe.shizuku.server.IShizukuServiceConnection;
+import moe.shizuku.server.IVirtualMachineManager;
+import moe.shizuku.server.IStorageProxy;
 
 interface IShizukuService {
 
@@ -45,4 +47,8 @@ interface IShizukuService {
     int getFlagsForUid(int uid, int mask) = 105;
 
     void updateFlagsForUid(int uid, int mask, int value) = 106;
+
+    IVirtualMachineManager getVirtualMachineManager() = 107;
+
+    IStorageProxy getStorageProxy() = 108;
  }
