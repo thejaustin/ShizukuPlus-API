@@ -5,6 +5,8 @@ import moe.shizuku.server.IShizukuApplication;
 import moe.shizuku.server.IShizukuServiceConnection;
 import moe.shizuku.server.IVirtualMachineManager;
 import moe.shizuku.server.IStorageProxy;
+import moe.shizuku.server.IAICorePlus;
+import moe.shizuku.server.IWindowManagerPlus;
 
 interface IShizukuService {
 
@@ -51,4 +53,8 @@ interface IShizukuService {
     IVirtualMachineManager getVirtualMachineManager() = 107;
 
     IStorageProxy getStorageProxy() = 108;
+
+    IAICorePlus getAICorePlus() = 109;
+
+    IWindowManagerPlus getWindowManagerPlus() = 110;
  }
