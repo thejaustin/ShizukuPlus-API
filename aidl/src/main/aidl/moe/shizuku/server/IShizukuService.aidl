@@ -7,6 +7,7 @@ import moe.shizuku.server.IVirtualMachineManager;
 import moe.shizuku.server.IStorageProxy;
 import moe.shizuku.server.IAICorePlus;
 import moe.shizuku.server.IWindowManagerPlus;
+import moe.shizuku.server.IContinuityBridge;
 
 interface IShizukuService {
 
@@ -57,4 +58,6 @@ interface IShizukuService {
     IAICorePlus getAICorePlus() = 109;
 
     IWindowManagerPlus getWindowManagerPlus() = 110;
+
+    IContinuityBridge getContinuityBridge() = 111;
  }
