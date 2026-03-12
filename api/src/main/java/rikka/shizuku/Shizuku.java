@@ -68,6 +68,11 @@ public class Shizuku {
         }
 
         @Override
+        public void dispatchLog(String appName, String packageName, String action) {
+            scheduleLogListener(appName, packageName, action);
+        }
+
+        @Override
         public void showPermissionConfirmation(int requestUid, int requestPid, String requestPackageName, int requestCode) {
             // non-app
         }
@@ -182,6 +187,10 @@ public class Shizuku {
         void onRequestPermissionResult(int requestCode, int grantResult);
     }
 
+    public interface OnLogListener {
+        void onLog(String appName, String packageName, String action);
+    }
+
     private static class ListenerHolder<T> {
 
         private final T listener;
@@ -209,6 +218,7 @@ public class Shizuku {
     private static final List<ListenerHolder<OnBinderReceivedListener>> RECEIVED_LISTENERS = new ArrayList<>();
     private static final List<ListenerHolder<OnBinderDeadListener>> DEAD_LISTENERS = new ArrayList<>();
     private static final List<ListenerHolder<OnRequestPermissionResultListener>> PERMISSION_LISTENERS = new ArrayList<>();
+    private static final List<ListenerHolder<OnLogListener>> LOG_LISTENERS = new ArrayList<>();
     private static final Handler MAIN_HANDLER = new Handler(Looper.getMainLooper());
 
     /**
@@ -418,6 +428,34 @@ public class Shizuku {
                         holder.listener.onRequestPermissionResult(requestCode, result);
                     } else {
                         MAIN_HANDLER.post(() -> holder.listener.onRequestPermissionResult(requestCode, result));
+                    }
+                }
+            }
+        }
+    }
+
+    public static void addLogListener(@NonNull OnLogListener listener) {
+        synchronized (RECEIVED_LISTENERS) {
+            LOG_LISTENERS.add(new ListenerHolder<>(listener, null));
+        }
+    }
+
+    public static void removeLogListener(@NonNull OnLogListener listener) {
+        synchronized (RECEIVED_LISTENERS) {
+            LOG_LISTENERS.removeIf(holder -> holder.listener == listener);
+        }
+    }
+
+    private static void scheduleLogListener(String appName, String packageName, String action) {
+        synchronized (RECEIVED_LISTENERS) {
+            for (ListenerHolder<OnLogListener> holder : LOG_LISTENERS) {
+                if (holder.handler != null) {
+                    holder.handler.post(() -> holder.listener.onLog(appName, packageName, action));
+                } else {
+                    if (Looper.myLooper() == Looper.getMainLooper()) {
+                        holder.listener.onLog(appName, packageName, action);
+                    } else {
+                        MAIN_HANDLER.post(() -> holder.listener.onLog(appName, packageName, action));
                     }
                 }
             }
