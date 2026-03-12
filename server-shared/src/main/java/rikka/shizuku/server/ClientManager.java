@@ -25,6 +25,10 @@ public class ClientManager<ConfigMgr extends ConfigManager> {
         return configManager;
     }
 
+    public List<ClientRecord> getClientRecords() {
+        return clientRecords;
+    }
+
     public List<ClientRecord> findClients(int uid) {
         synchronized (this) {
             List<ClientRecord> res = new ArrayList<>();
