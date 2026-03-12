@@ -66,6 +66,8 @@ interface IShizukuService {
 
     void updatePlusFeatureEnabled(String key, boolean enabled) = 112;
 
+    void setPlusSetting(String key, String value) = 116;
+
     IOverlayManagerPlus getOverlayManagerPlus() = 113;
 
     INetworkGovernorPlus getNetworkGovernorPlus() = 114;
