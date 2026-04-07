@@ -475,6 +475,114 @@ public class ShizukuPlusAPI {
             }
             return 0;
         }
+
+        /**
+         * Schedule a high-priority task on the Neural Processing Unit (NPU).
+         */
+        public static boolean scheduleNPULoad(@NonNull Bundle taskData) {
+            IAICorePlus service = getService();
+            if (service != null) {
+                try {
+                    return service.scheduleNPULoad(taskData);
+                } catch (RemoteException e) {
+                    Log.w(TAG, "Failed to schedule NPU load", e);
+                }
+            }
+            return false;
+        }
+
+        /**
+         * Capture a privileged screenshot of a specific window/layer for AI analysis.
+         */
+        @Nullable
+        public static Bitmap captureLayer(int layerId) {
+            IAICorePlus service = getService();
+            if (service != null) {
+                try {
+                    return service.captureLayer(layerId);
+                } catch (RemoteException e) {
+                    Log.w(TAG, "Failed to capture layer " + layerId, e);
+                }
+            }
+            return null;
+        }
+
+        /**
+         * Get current system intelligence context (detected entities, screen text).
+         */
+        @Nullable
+        public static Bundle getSystemContext() {
+            IAICorePlus service = getService();
+            if (service != null) {
+                try {
+                    return service.getSystemContext();
+                } catch (RemoteException e) {
+                    Log.w(TAG, "Failed to get system context", e);
+                }
+            }
+            return null;
+        }
+
+        /**
+         * Simulate a physical touch on the screen.
+         */
+        public static boolean simulateTouch(float x, float y) {
+            IAICorePlus service = getService();
+            if (service != null) {
+                try {
+                    return service.simulateTouch(x, y);
+                } catch (RemoteException e) {
+                    Log.w(TAG, "Failed to simulate touch", e);
+                }
+            }
+            return false;
+        }
+
+        /**
+         * Simulate a swipe gesture on the screen.
+         */
+        public static boolean simulateSwipe(float x1, float y1, float x2, float y2, int duration) {
+            IAICorePlus service = getService();
+            if (service != null) {
+                try {
+                    return service.simulateSwipe(x1, y1, x2, y2, duration);
+                } catch (RemoteException e) {
+                    Log.w(TAG, "Failed to simulate swipe", e);
+                }
+            }
+            return false;
+        }
+
+        /**
+         * Simulate typing text input.
+         */
+        public static boolean simulateText(@NonNull String text) {
+            IAICorePlus service = getService();
+            if (service != null) {
+                try {
+                    return service.simulateText(text);
+                } catch (RemoteException e) {
+                    Log.w(TAG, "Failed to simulate text", e);
+                }
+            }
+            return false;
+        }
+
+        /**
+         * Get the current window hierarchy (UI elements and text) for AI parsing.
+         */
+        @Nullable
+        public static String getWindowHierarchy() {
+            IAICorePlus service = getService();
+            if (service != null) {
+                try {
+                    return service.getWindowHierarchy();
+                } catch (RemoteException e) {
+                    Log.w(TAG, "Failed to get window hierarchy", e);
+                }
+            }
+            return null;
+        }
     }
 
     /**
