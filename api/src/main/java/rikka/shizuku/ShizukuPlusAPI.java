@@ -14,6 +14,8 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Collections;
+import android.graphics.Bitmap;
+import android.os.ParcelFileDescriptor;
 
 import moe.shizuku.server.IActivityManagerPlus;
 import moe.shizuku.server.IWindowManagerPlus;
@@ -299,6 +301,21 @@ public class ShizukuPlusAPI {
             }
             return Collections.emptyList();
         }
+
+        /**
+         * Inject a dynamic resource overlay (Android 12+).
+         */
+        public static boolean injectResourceOverlay(@NonNull String targetPackage, @NonNull String resourceName, int type, @NonNull String value) {
+            IOverlayManagerPlus service = getService();
+            if (service != null) {
+                try {
+                    return service.injectResourceOverlay(targetPackage, resourceName, type, value);
+                } catch (RemoteException e) {
+                    Log.w(TAG, "Failed to inject resource overlay for " + targetPackage, e);
+                }
+            }
+            return false;
+        }
     }
 
     /**
@@ -330,6 +347,21 @@ public class ShizukuPlusAPI {
                     return service.killAllBackgroundProcesses();
                 } catch (RemoteException e) {
                     Log.w(TAG, "Failed to kill all background processes", e);
+                }
+            }
+            return false;
+        }
+
+        /**
+         * Set the standby bucket for an app (e.g., ACTIVE, WORKING_SET, FREQUENT, RARE, RESTRICTED).
+         */
+        public static boolean setAppStandbyBucket(@NonNull String packageName, int bucket) {
+            IActivityManagerPlus service = getService();
+            if (service != null) {
+                try {
+                    return service.setAppStandbyBucket(packageName, bucket);
+                } catch (RemoteException e) {
+                    Log.w(TAG, "Failed to set standby bucket for " + packageName, e);
                 }
             }
             return false;
@@ -386,6 +418,36 @@ public class ShizukuPlusAPI {
                     return service.setPrivateDns(mode, hostname);
                 } catch (RemoteException e) {
                     Log.w(TAG, "Failed to set private DNS mode=" + mode + " hostname=" + hostname, e);
+                }
+            }
+            return false;
+        }
+
+        /**
+         * Add a package to the system's restricted network list (firewall).
+         */
+        public static boolean restrictAppNetwork(@NonNull String packageName, boolean restricted) {
+            INetworkGovernorPlus service = getService();
+            if (service != null) {
+                try {
+                    return service.restrictAppNetwork(packageName, restricted);
+                } catch (RemoteException e) {
+                    Log.w(TAG, "Failed to restrict app network for " + packageName, e);
+                }
+            }
+            return false;
+        }
+
+        /**
+         * Get the current network restriction state for a package.
+         */
+        public static boolean isAppNetworkRestricted(@NonNull String packageName) {
+            INetworkGovernorPlus service = getService();
+            if (service != null) {
+                try {
+                    return service.isAppNetworkRestricted(packageName);
+                } catch (RemoteException e) {
+                    Log.w(TAG, "Failed to get app network restricted state for " + packageName, e);
                 }
             }
             return false;
@@ -473,6 +535,55 @@ public class ShizukuPlusAPI {
             }
             return false;
         }
+
+        public static boolean stop(@NonNull String name) {
+            IVirtualMachineManager service = getService();
+            if (service != null) {
+                try {
+                    return service.stop(name);
+                } catch (RemoteException e) {
+                    Log.w(TAG, "Failed to stop virtual machine " + name, e);
+                }
+            }
+            return false;
+        }
+
+        public static boolean create(@NonNull String name, @NonNull Bundle config) {
+            IVirtualMachineManager service = getService();
+            if (service != null) {
+                try {
+                    return service.create(name, config);
+                } catch (RemoteException e) {
+                    Log.w(TAG, "Failed to create virtual machine " + name, e);
+                }
+            }
+            return false;
+        }
+
+        public static boolean delete(@NonNull String name) {
+            IVirtualMachineManager service = getService();
+            if (service != null) {
+                try {
+                    return service.delete(name);
+                } catch (RemoteException e) {
+                    Log.w(TAG, "Failed to delete virtual machine " + name, e);
+                }
+            }
+            return false;
+        }
+
+        @Nullable
+        public static String getStatus(@NonNull String name) {
+            IVirtualMachineManager service = getService();
+            if (service != null) {
+                try {
+                    return service.getStatus(name);
+                } catch (RemoteException e) {
+                    Log.w(TAG, "Failed to get status of virtual machine " + name, e);
+                }
+            }
+            return null;
+        }
     }
 
     /**
@@ -507,6 +618,45 @@ public class ShizukuPlusAPI {
                 }
             }
             return false;
+        }
+
+        @Nullable
+        public static ParcelFileDescriptor openFile(@NonNull String path, int mode) {
+            IStorageProxy service = getService();
+            if (service != null) {
+                try {
+                    return service.openFile(path, mode);
+                } catch (RemoteException e) {
+                    Log.w(TAG, "Failed to open file: " + path, e);
+                }
+            }
+            return null;
+        }
+
+        @Nullable
+        public static List<String> listFiles(@NonNull String path) {
+            IStorageProxy service = getService();
+            if (service != null) {
+                try {
+                    return service.listFiles(path);
+                } catch (RemoteException e) {
+                    Log.w(TAG, "Failed to list files in: " + path, e);
+                }
+            }
+            return null;
+        }
+
+        @Nullable
+        public static Bundle getFileInfo(@NonNull String path) {
+            IStorageProxy service = getService();
+            if (service != null) {
+                try {
+                    return service.getFileInfo(path);
+                } catch (RemoteException e) {
+                    Log.w(TAG, "Failed to get file info for: " + path, e);
+                }
+            }
+            return null;
         }
     }
 
