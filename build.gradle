@@ -98,13 +98,13 @@ ext {
     POM_INCEPTION_YEAR = "2026"
     POM_PACKAGING = "aar"
 
-    POM_URL = "https://github.com/thejaustin/Shizuku+-API"
-    POM_SCM_URL = "https://github.com/thejaustin/Shizuku+-API"
-    POM_SCM_CONNECTION = "scm:git@github.com:thejaustin/Shizuku+-API.git"
-    POM_SCM_DEV_CONNECTION = "scm:git@github.com:thejaustin/Shizuku+-API.git"
+    POM_URL = "https://github.com/thejaustin/ShizukuPlus-API"
+    POM_SCM_URL = "https://github.com/thejaustin/ShizukuPlus-API"
+    POM_SCM_CONNECTION = "scm:git@github.com:thejaustin/ShizukuPlus-API.git"
+    POM_SCM_DEV_CONNECTION = "scm:git@github.com:thejaustin/ShizukuPlus-API.git"
 
     POM_LICENCE_NAME = "MIT License"
-    POM_LICENCE_URL = "https://github.com/thejaustin/Shizuku+-API/blob/master/LICENSE"
+    POM_LICENCE_URL = "https://github.com/thejaustin/ShizukuPlus-API/blob/master/LICENSE"
     POM_LICENCE_DIST = "repo"
 
     POM_DEVELOPER_ID = "thejaustin"

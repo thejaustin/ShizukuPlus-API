@@ -1,6 +1,6 @@
 # Shizuku+-API
 
-Shizuku+-API is an enhanced, developer-friendly version of the Shizuku API. It provides a modernized interface for interacting with [Shizuku+](https://github.com/thejaustin/Shizuku+), while maintaining full backward compatibility with standard Shizuku and Sui servers.
+Shizuku+-API is an enhanced, developer-friendly version of the Shizuku API. It provides a modernized interface for interacting with [Shizuku+](https://github.com/thejaustin/ShizukuPlus), while maintaining full backward compatibility with standard Shizuku and Sui servers.
 
 ## ✨ Key Features (Plus Upgrades)
 
