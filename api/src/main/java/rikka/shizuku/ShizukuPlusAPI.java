@@ -30,7 +30,7 @@ import af.shizuku.server.IStorageProxy;
  * Shizuku+API provides extended features for Shizuku+,
  * including Dhizuku (Device Owner) compatibility and enhanced server communication.
  */
-public class Shizuku+API {
+public class ShizukuPlusAPI {
     private static final String TAG = "Shizuku+API";
 
     /**
