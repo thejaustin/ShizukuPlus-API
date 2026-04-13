@@ -153,7 +153,9 @@ public class ShizukuPlusAPI {
                         while ((line = reader.readLine()) != null) {
                             error.append(line).append('\n');
                         }
-                    } catch (Exception ignored) {}
+                    } catch (Exception e) {
+                        Log.w("ShizukuPlusAPI", "Failed to read stderr from shell command", e);
+                    }
                 });
                 stderrThread.start();
 
