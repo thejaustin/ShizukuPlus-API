@@ -328,21 +328,35 @@ public abstract class Service<
     @CallSuper
     @Override
     public boolean onTransact(int code, Parcel data, Parcel reply, int flags) throws RemoteException {
-        if (code == ShizukuApiConstants.BINDER_TRANSACTION_transact) {
-            data.enforceInterface(ShizukuApiConstants.BINDER_DESCRIPTOR);
-            transactRemote(data, reply, flags);
-            return true;
-        } else if (code == 14 /* attachApplication <= v12 */) {
-            data.enforceInterface(ShizukuApiConstants.BINDER_DESCRIPTOR);
-            IBinder binder = data.readStrongBinder();
-            String packageName = data.readString();
-            Bundle args = new Bundle();
-            args.putString(ShizukuApiConstants.ATTACH_APPLICATION_PACKAGE_NAME, packageName);
-            args.putInt(ShizukuApiConstants.ATTACH_APPLICATION_API_VERSION, -1);
-            attachApplication(IShizukuApplication.Stub.asInterface(binder), args);
-            reply.writeNoException();
-            return true;
-        } else if (rishService.onTransact(code, data, reply, flags)) {
+        // Support legacy interface tokens from existing Shizuku apps
+        data.setDataPosition(0);
+        String descriptor = data.readInterfaceToken();
+        boolean isLegacy = "moe.shizuku.server.IShizukuService".equals(descriptor);
+        
+        if (isLegacy || ShizukuApiConstants.BINDER_DESCRIPTOR.equals(descriptor)) {
+            if (code == ShizukuApiConstants.BINDER_TRANSACTION_transact) {
+                // transactRemote handles its own enforceInterface or equivalent
+                transactRemote(data, reply, flags);
+                return true;
+            } else if (code == 14 /* attachApplication <= v12 */) {
+                IBinder binder = data.readStrongBinder();
+                String packageName = data.readString();
+                Bundle args = new Bundle();
+                args.putString(ShizukuApiConstants.ATTACH_APPLICATION_PACKAGE_NAME, packageName);
+                args.putInt(ShizukuApiConstants.ATTACH_APPLICATION_API_VERSION, -1);
+                attachApplication(IShizukuApplication.Stub.asInterface(binder), args);
+                reply.writeNoException();
+                return true;
+            } else if (code == 17 /* attachApplication v13+ */) {
+                IBinder binder = data.readStrongBinder();
+                Bundle args = data.readInt() != 0 ? Bundle.CREATOR.createFromParcel(data) : null;
+                attachApplication(IShizukuApplication.Stub.asInterface(binder), args);
+                reply.writeNoException();
+                return true;
+            }
+        }
+
+        if (rishService.onTransact(code, data, reply, flags)) {
             return true;
         }
         return super.onTransact(code, data, reply, flags);
