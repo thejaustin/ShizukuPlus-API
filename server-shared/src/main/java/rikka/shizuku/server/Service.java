@@ -15,6 +15,7 @@ import androidx.annotation.Nullable;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.util.Arrays;
 
 import af.shizuku.server.IRemoteProcess;
@@ -325,12 +326,24 @@ public abstract class Service<
         return true;
     }
 
+    // readInterfaceToken() is a hidden API not in public SDK stubs — access via reflection.
+    // Safe in the privileged server process where hidden API restrictions are not enforced.
+    private static String readInterfaceTokenCompat(Parcel parcel) {
+        try {
+            Method m = Parcel.class.getDeclaredMethod("readInterfaceToken");
+            m.setAccessible(true);
+            return (String) m.invoke(parcel);
+        } catch (Exception ignored) {
+            return "";
+        }
+    }
+
     @CallSuper
     @Override
     public boolean onTransact(int code, Parcel data, Parcel reply, int flags) throws RemoteException {
         // Support legacy interface tokens from existing Shizuku apps
         data.setDataPosition(0);
-        String descriptor = data.readInterfaceToken();
+        String descriptor = readInterfaceTokenCompat(data);
         boolean isLegacy = "moe.shizuku.server.IShizukuService".equals(descriptor);
         
         if (isLegacy || ShizukuApiConstants.BINDER_DESCRIPTOR.equals(descriptor)) {
