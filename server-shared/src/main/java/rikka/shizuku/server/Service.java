@@ -151,7 +151,30 @@ public abstract class Service<
             targetFlags = flags;
         }
 
-        LOGGER.d("transact: uid=%d, descriptor=%s, code=%d", Binder.getCallingUid(), targetBinder.getInterfaceDescriptor(), targetCode);
+        String descriptor = targetBinder.getInterfaceDescriptor();
+        
+        // AIDL Logging (Issue #199)
+        if (checkPlusFeatureEnabled("binder_logging")) {
+            LOGGER.i("AIDL: uid=%d pkg=%s descriptor=%s code=%d", 
+                callingUid, (clientRecord != null ? clientRecord.packageName : "unknown"), 
+                descriptor, targetCode);
+        }
+
+        // Binder Firewall (Issue #199)
+        if (checkPlusFeatureEnabled("binder_firewall")) {
+            if (isBinderCallBlocked(callingUid, descriptor, targetCode)) {
+                LOGGER.w("Firewall: Blocked transaction %s code %d from uid %d", descriptor, targetCode, callingUid);
+                throw new SecurityException("Binder Firewall: Transaction blocked by Shizuku+ policy");
+            }
+        }
+
+        // Shadow Binder (Issue #199) - optional interception point
+        if (checkPlusFeatureEnabled("shadow_binder")) {
+            if (handleShadowBinderTransaction(targetBinder, targetCode, data, reply, targetFlags)) {
+                return;
+            }
+        }
+
         Parcel newData = Parcel.obtain();
         try {
             newData.appendFrom(data, data.dataPosition(), data.dataAvail());
@@ -166,6 +189,27 @@ public abstract class Service<
         } finally {
             newData.recycle();
         }
+    }
+
+    /**
+     * Shadow Binder (Issue #199)
+     * Allows intercepting and mocking system binder calls.
+     */
+    protected boolean handleShadowBinderTransaction(IBinder target, int code, Parcel data, Parcel reply, int flags) {
+        // To be implemented by subclasses if shadow binder is active
+        return false;
+    }
+
+    /**
+     * Binder Firewall (Issue #199)
+     * Checks if a binder transaction should be blocked based on UID and descriptor.
+     */
+    protected boolean isBinderCallBlocked(int uid, String descriptor, int code) {
+        // Example: Block apps from turning off Bluetooth or WiFi via Shizuku if they aren't authorized
+        if (descriptor == null) return false;
+        
+        // Stub for dynamic policy checking
+        return false;
     }
 
     @Override
