@@ -88,13 +88,46 @@ public abstract class UserServiceRecord {
         broadcastBinderReceived();
     }
 
+    private void callConnected(IShizukuServiceConnection conn, IBinder service) throws RemoteException {
+        IBinder binder = conn.asBinder();
+        String descriptor = binder.getInterfaceDescriptor();
+        if ("moe.shizuku.server.IShizukuServiceConnection".equals(descriptor)) {
+            Parcel data = Parcel.obtain();
+            try {
+                data.writeInterfaceToken(descriptor);
+                data.writeStrongBinder(service);
+                binder.transact(1 /* connected */, data, null, Binder.FLAG_ONEWAY);
+            } finally {
+                data.recycle();
+            }
+        } else {
+            conn.connected(service);
+        }
+    }
+
+    private void callDied(IShizukuServiceConnection conn) throws RemoteException {
+        IBinder binder = conn.asBinder();
+        String descriptor = binder.getInterfaceDescriptor();
+        if ("moe.shizuku.server.IShizukuServiceConnection".equals(descriptor)) {
+            Parcel data = Parcel.obtain();
+            try {
+                data.writeInterfaceToken(descriptor);
+                binder.transact(2 /* died */, data, null, Binder.FLAG_ONEWAY);
+            } finally {
+                data.recycle();
+            }
+        } else {
+            conn.died();
+        }
+    }
+
     public void broadcastBinderReceived() {
         LOGGER.v("Broadcast binder received for service record %s", token);
 
         int count = callbacks.beginBroadcast();
         for (int i = 0; i < count; i++) {
             try {
-                callbacks.getBroadcastItem(i).connected(service);
+                callConnected(callbacks.getBroadcastItem(i), service);
             } catch (Throwable e) {
                 LOGGER.w("Failed to call connected %s", token);
             }
@@ -108,7 +141,7 @@ public abstract class UserServiceRecord {
         int count = callbacks.beginBroadcast();
         for (int i = 0; i < count; i++) {
             try {
-                callbacks.getBroadcastItem(i).died();
+                callDied(callbacks.getBroadcastItem(i));
             } catch (Throwable e) {
                 LOGGER.w("Failed to call died %s", token);
             }

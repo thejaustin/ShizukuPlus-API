@@ -26,4 +26,14 @@ interface IWindowManagerPlus {
      * Set a window as 'Always on Top' using privileged flags.
      */
     void setAlwaysOnTop(int taskId, boolean enabled);
+
+    /**
+     * Force immersive mode (hide bars) for the entire system or specific app.
+     */
+    void setImmersiveMode(boolean enabled);
+
+    /**
+     * Force high refresh rate (120Hz+) in Samsung DeX mode.
+     */
+    void setDexHighRefreshRate(boolean enabled);
 }

@@ -389,27 +389,64 @@ public abstract class Service<
         data.setDataPosition(0);
         String descriptor = readInterfaceTokenCompat(data);
         boolean isLegacy = "moe.shizuku.server.IShizukuService".equals(descriptor);
-        
-        if (isLegacy || ShizukuApiConstants.BINDER_DESCRIPTOR.equals(descriptor)) {
+        boolean isNew = ShizukuApiConstants.BINDER_DESCRIPTOR.equals(descriptor);
+
+        if (isLegacy || isNew) {
             if (code == ShizukuApiConstants.BINDER_TRANSACTION_transact) {
-                // transactRemote handles its own enforceInterface or equivalent
                 transactRemote(data, reply, flags);
                 return true;
-            } else if (code == 14 /* attachApplication <= v12 */) {
-                IBinder binder = data.readStrongBinder();
-                String packageName = data.readString();
-                Bundle args = new Bundle();
-                args.putString(ShizukuApiConstants.ATTACH_APPLICATION_PACKAGE_NAME, packageName);
-                args.putInt(ShizukuApiConstants.ATTACH_APPLICATION_API_VERSION, -1);
-                attachApplication(IShizukuApplication.Stub.asInterface(binder), args);
-                reply.writeNoException();
-                return true;
-            } else if (code == 17 /* attachApplication v13+ */) {
-                IBinder binder = data.readStrongBinder();
-                Bundle args = data.readInt() != 0 ? Bundle.CREATOR.createFromParcel(data) : null;
-                attachApplication(IShizukuApplication.Stub.asInterface(binder), args);
-                reply.writeNoException();
-                return true;
+            }
+
+            if (isLegacy) {
+                // Manually handle all methods for legacy callers to avoid descriptor mismatch in super.onTransact
+                switch (code) {
+                    case 2: // getVersion
+                        reply.writeNoException();
+                        reply.writeInt(getVersion());
+                        return true;
+                    case 3: // getUid
+                        reply.writeNoException();
+                        reply.writeInt(getUid());
+                        return true;
+                    case 4: // checkPermission
+                        reply.writeNoException();
+                        reply.writeInt(checkPermission(data.readString()));
+                        return true;
+                    case 7: // newProcess
+                        String[] cmd = data.createStringArray();
+                        String[] env = data.createStringArray();
+                        String dir = data.readString();
+                        IRemoteProcess process = newProcess(cmd, env, dir);
+                        reply.writeNoException();
+                        reply.writeStrongBinder(process != null ? process.asBinder() : null);
+                        return true;
+                    case 8: // getSELinuxContext
+                        reply.writeNoException();
+                        reply.writeString(getSELinuxContext());
+                        return true;
+                    case 14: // legacy attachApplication
+                        IBinder binder = data.readStrongBinder();
+                        String packageName = data.readString();
+                        Bundle args = new Bundle();
+                        args.putString(ShizukuApiConstants.ATTACH_APPLICATION_PACKAGE_NAME, packageName);
+                        args.putInt(ShizukuApiConstants.ATTACH_APPLICATION_API_VERSION, -1);
+                        attachApplication(IShizukuApplication.Stub.asInterface(binder), args);
+                        reply.writeNoException();
+                        return true;
+                }
+            } else {
+                // Shizuku+ specific handling for code 14 and 17
+                if (code == 14 /* requestPermission */) {
+                    requestPermission(data.readInt());
+                    reply.writeNoException();
+                    return true;
+                } else if (code == 17 /* attachApplication v13+ */) {
+                    IBinder binder = data.readStrongBinder();
+                    Bundle args = data.readInt() != 0 ? Bundle.CREATOR.createFromParcel(data) : null;
+                    attachApplication(IShizukuApplication.Stub.asInterface(binder), args);
+                    reply.writeNoException();
+                    return true;
+                }
             }
         }
 
