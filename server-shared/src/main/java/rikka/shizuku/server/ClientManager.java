@@ -86,6 +86,12 @@ public class ClientManager<ConfigMgr extends ConfigManager> {
         clientRecords.add(clientRecord);
         return clientRecord;
     }
+
+    public void remove(String packageName) {
+        synchronized (this) {
+            clientRecords.removeIf(clientRecord -> clientRecord.packageName.equals(packageName));
+        }
+    }
 }
 
 
