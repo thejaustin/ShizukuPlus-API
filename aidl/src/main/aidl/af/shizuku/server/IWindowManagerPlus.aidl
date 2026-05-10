@@ -1,5 +1,8 @@
 package af.shizuku.server;
 
+import android.graphics.Rect;
+import android.os.Bundle;
+
 interface IWindowManagerPlus {
     /**
      * Force enable free-form resizing for a specific package,

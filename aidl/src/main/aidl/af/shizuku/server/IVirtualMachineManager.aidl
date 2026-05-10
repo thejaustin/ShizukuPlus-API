@@ -1,5 +1,7 @@
 package af.shizuku.server;
 
+import android.os.Bundle;
+
 interface IVirtualMachineManager {
     /**
      * Create a new Virtual Machine.

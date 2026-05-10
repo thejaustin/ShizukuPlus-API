@@ -1,5 +1,7 @@
 package af.shizuku.server;
 
+import android.os.Bundle;
+
 interface IContinuityBridge {
     /**
      * Sync a piece of data to another device running Shizuku+.
