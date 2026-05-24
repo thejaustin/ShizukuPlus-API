@@ -489,7 +489,8 @@ public class ShizukuPlusAPI {
         /**
          * Schedule a high-priority task on the Neural Processing Unit (NPU).
          */
-        public static boolean scheduleNPULoad(@NonNull Bundle taskData) {
+        @Nullable
+        public static Bundle scheduleNPULoad(@NonNull Bundle taskData) {
             IAICorePlus service = getService();
             if (service != null) {
                 try {
@@ -498,7 +499,7 @@ public class ShizukuPlusAPI {
                     Log.w(TAG, "Failed to schedule NPU load", e);
                 }
             }
-            return false;
+            return null;
         }
 
         /**
