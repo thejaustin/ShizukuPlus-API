@@ -50,6 +50,10 @@ public class ClientManager<ConfigMgr extends ConfigManager> {
         return null;
     }
 
+    public int getClientCount() {
+        return clientRecords.size();
+    }
+
     public ClientRecord requireClient(int callingUid, int callingPid) {
         return requireClient(callingUid, callingPid, false);
     }

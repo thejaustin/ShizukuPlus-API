@@ -39,4 +39,9 @@ interface IWindowManagerPlus {
      * Force high refresh rate (120Hz+) in Samsung DeX mode.
      */
     void setDexHighRefreshRate(boolean enabled);
+
+    /**
+     * Get a list of visible windows and their basic properties.
+     */
+    Bundle getVisibleWindows();
 }

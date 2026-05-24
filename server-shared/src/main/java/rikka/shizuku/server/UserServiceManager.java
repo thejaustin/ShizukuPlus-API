@@ -33,7 +33,7 @@ import rikka.hidden.compat.PackageManagerApis;
 import rikka.shizuku.ShizukuApiConstants;
 import rikka.shizuku.server.util.AbiUtil;
 import rikka.shizuku.server.util.Logger;
-import rikka.shizuku.server.util.UserHandleCompat;
+import af.shizuku.common.util.UserHandleCompat;
 
 public abstract class UserServiceManager {
 

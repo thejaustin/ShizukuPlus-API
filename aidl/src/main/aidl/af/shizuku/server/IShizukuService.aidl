@@ -6,6 +6,7 @@ import af.shizuku.server.IShizukuServiceConnection;
 import af.shizuku.server.IVirtualMachineManager;
 import af.shizuku.server.IStorageProxy;
 import af.shizuku.server.IAICorePlus;
+import af.shizuku.server.IAIAutomationBridge;
 import af.shizuku.server.IWindowManagerPlus;
 import af.shizuku.server.IContinuityBridge;
 import af.shizuku.server.IOverlayManagerPlus;
@@ -81,4 +82,6 @@ interface IShizukuService {
     String getPlusSetting(String key) = 119;
 
     boolean isPlusFeatureEnabled(String key) = 120;
+
+    void registerAIAutomationBridge(in IAIAutomationBridge bridge) = 121;
  }

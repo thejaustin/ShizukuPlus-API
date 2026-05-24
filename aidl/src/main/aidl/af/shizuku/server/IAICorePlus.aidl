@@ -13,7 +13,7 @@ interface IAICorePlus {
     /**
      * Schedule a high-priority task on the Neural Processing Unit (NPU).
      */
-    boolean scheduleNPULoad(in Bundle taskData);
+    Bundle scheduleNPULoad(in Bundle taskData);
 
     /**
      * Capture a privileged screenshot of a specific window/layer for AI analysis.
@@ -44,4 +44,9 @@ interface IAICorePlus {
      * Get the current window hierarchy (UI elements and text) for AI parsing.
      */
     String getWindowHierarchy();
+
+    /**
+     * Get real-time server performance and diagnostic statistics.
+     */
+    Bundle getServerStats();
 }

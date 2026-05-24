@@ -29,7 +29,7 @@ public class Sui {
                 return received;
             }
         } catch (Throwable e) {
-            e.printStackTrace();
+            android.util.Log.e("Sui", "requestBinder failed", e);
         } finally {
             data.recycle();
             reply.recycle();

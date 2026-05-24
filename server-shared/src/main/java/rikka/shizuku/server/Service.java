@@ -29,7 +29,7 @@ import rikka.shizuku.ShizukuApiConstants;
 import rikka.shizuku.server.api.RemoteProcessHolder;
 import rikka.shizuku.server.util.Logger;
 import rikka.shizuku.server.util.OsUtils;
-import rikka.shizuku.server.util.UserHandleCompat;
+import af.shizuku.common.util.UserHandleCompat;
 
 public abstract class Service<
         UserServiceMgr extends UserServiceManager,
