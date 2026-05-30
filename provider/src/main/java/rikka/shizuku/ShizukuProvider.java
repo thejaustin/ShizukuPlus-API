@@ -243,7 +243,8 @@ public class ShizukuProvider extends ContentProvider {
 
         BinderContainer container = new BinderContainer(binder);
         reply.putParcelable(EXTRA_BINDER, container);
-        reply.putParcelable("rikka.shizuku.intent.extra.BINDER", container);
+        reply.putParcelable("rikka.shizuku.intent.extra.BINDER", new rikka.shizuku.BinderContainer(binder));
+        reply.putParcelable("moe.shizuku.privileged.api.intent.extra.BINDER", new moe.shizuku.api.BinderContainer(binder));
         return true;
     }
 
