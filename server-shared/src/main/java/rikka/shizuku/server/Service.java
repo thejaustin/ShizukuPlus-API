@@ -182,13 +182,27 @@ public abstract class Service<
             LOGGER.w(tr, "appendFrom");
             return;
         }
+        
+        long startTime = System.nanoTime();
         try {
             long id = Binder.clearCallingIdentity();
             targetBinder.transact(targetCode, newData, reply, targetFlags);
             Binder.restoreCallingIdentity(id);
         } finally {
             newData.recycle();
+            long durationNs = System.nanoTime() - startTime;
+            if (checkPlusFeatureEnabled("binder_profiler")) {
+                recordTransactionMetrics(clientRecord, descriptor, targetCode, durationNs);
+            }
         }
+    }
+
+    /**
+     * System Health & Binder Profiler (Issue #211)
+     */
+    protected void recordTransactionMetrics(ClientRecord clientRecord, String descriptor, int code, long durationNs) {
+        String pkg = clientRecord != null ? clientRecord.packageName : "unknown";
+        LOGGER.i("PROFILER: pkg=%s desc=%s code=%d latency_ms=%.2f", pkg, descriptor, code, durationNs / 1000000.0f);
     }
 
     /**
