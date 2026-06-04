@@ -20,4 +20,9 @@ interface IOverlayManagerPlus {
      * Inject a dynamic resource overlay (Android 12+).
      */
     boolean injectResourceOverlay(String targetPackage, String resourceName, int type, String value);
+
+    /**
+     * [Ghost Bridge] Prepares an OverlayFS shadow mount for rootless system modification simulation.
+     */
+    boolean prepareShadowMount(String callingPackage, String partition);
 }
