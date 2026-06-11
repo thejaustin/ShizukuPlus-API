@@ -31,7 +31,7 @@ import java.util.List;
 import java.util.Objects;
 
 import af.shizuku.server.IShizukuApplication;
-import af.shizuku.server.IShizukuService;
+import moe.shizuku.server.IShizukuService;
 
 public class Shizuku {
 
@@ -98,7 +98,7 @@ public class Shizuku {
         Parcel data = Parcel.obtain();
         Parcel reply = Parcel.obtain();
         try {
-            data.writeInterfaceToken("af.shizuku.server.IShizukuService");
+            data.writeInterfaceToken("moe.shizuku.server.IShizukuService");
             data.writeStrongBinder(SHIZUKU_APPLICATION.asBinder());
             data.writeInt(1);
             args.writeToParcel(data, 0);
@@ -118,7 +118,7 @@ public class Shizuku {
         Parcel data = Parcel.obtain();
         Parcel reply = Parcel.obtain();
         try {
-            data.writeInterfaceToken("af.shizuku.server.IShizukuService");
+            data.writeInterfaceToken("moe.shizuku.server.IShizukuService");
             data.writeStrongBinder(SHIZUKU_APPLICATION.asBinder());
             data.writeString(packageName);
             result = binder.transact(14 /*IShizukuService.Stub.TRANSACTION_attachApplication*/, data, reply, 0);
@@ -1027,7 +1027,7 @@ public class Shizuku {
         Parcel data = Parcel.obtain();
         Parcel reply = Parcel.obtain();
         try {
-            data.writeInterfaceToken("af.shizuku.server.IShizukuService");
+            data.writeInterfaceToken("moe.shizuku.server.IShizukuService");
             // 10002 = BINDER_TRANSACTION_isCustomApiEnabled
             if (binder.transact(10002, data, reply, 0)) {
                 reply.readException();
@@ -1052,7 +1052,7 @@ public class Shizuku {
             Parcel data = Parcel.obtain();
             Parcel reply = Parcel.obtain();
             try {
-                data.writeInterfaceToken("af.shizuku.server.IShizukuService");
+                data.writeInterfaceToken("moe.shizuku.server.IShizukuService");
                 // 10003 = BINDER_TRANSACTION_getDhizukuBinder
                 if (binder.transact(10003, data, reply, 0)) {
                     reply.readException();

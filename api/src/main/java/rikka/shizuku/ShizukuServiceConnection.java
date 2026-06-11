@@ -12,7 +12,7 @@ import androidx.annotation.Nullable;
 import java.util.HashSet;
 import java.util.Set;
 
-import af.shizuku.server.IShizukuServiceConnection;
+import moe.shizuku.server.IShizukuServiceConnection;
 
 class ShizukuServiceConnection extends IShizukuServiceConnection.Stub {
 

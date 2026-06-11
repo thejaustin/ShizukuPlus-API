@@ -10,7 +10,7 @@ import android.os.RemoteException;
 
 import java.util.UUID;
 
-import af.shizuku.server.IShizukuServiceConnection;
+import moe.shizuku.server.IShizukuServiceConnection;
 import rikka.shizuku.server.util.HandlerUtil;
 import rikka.shizuku.server.util.Logger;
 

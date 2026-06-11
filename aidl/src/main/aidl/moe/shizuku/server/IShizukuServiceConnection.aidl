@@ -1,4 +1,4 @@
-package af.shizuku.server;
+package moe.shizuku.server;
 
 interface IShizukuServiceConnection {
 

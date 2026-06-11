@@ -28,7 +28,7 @@ import java.util.Objects;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 
-import af.shizuku.server.IShizukuServiceConnection;
+import moe.shizuku.server.IShizukuServiceConnection;
 import rikka.hidden.compat.PackageManagerApis;
 import rikka.shizuku.ShizukuApiConstants;
 import rikka.shizuku.server.util.AbiUtil;

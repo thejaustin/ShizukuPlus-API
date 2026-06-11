@@ -20,8 +20,8 @@ import java.util.Arrays;
 
 import af.shizuku.server.IRemoteProcess;
 import af.shizuku.server.IShizukuApplication;
-import af.shizuku.server.IShizukuService;
-import af.shizuku.server.IShizukuServiceConnection;
+import moe.shizuku.server.IShizukuService;
+import moe.shizuku.server.IShizukuServiceConnection;
 import rikka.hidden.compat.PermissionManagerApis;
 import rikka.rish.RishConfig;
 import rikka.rish.RishService;

@@ -10,7 +10,7 @@ public class ShizukuApiConstants {
     public static final int SERVER_PATCH_VERSION = 6;
 
     // binder
-    public static final String BINDER_DESCRIPTOR = "af.shizuku.server.IShizukuService";
+    public static final String BINDER_DESCRIPTOR = "moe.shizuku.server.IShizukuService";
     public static final int BINDER_TRANSACTION_transact = 1;
 
     // user service

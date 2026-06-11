@@ -49,7 +49,7 @@ public class ShizukuPlusAPI {
         Parcel data = Parcel.obtain();
         Parcel reply = Parcel.obtain();
         try {
-            data.writeInterfaceToken("af.shizuku.server.IShizukuService");
+            data.writeInterfaceToken("moe.shizuku.server.IShizukuService");
             if (serviceBinder.transact(code, data, reply, 0)) {
                 reply.readException();
                 IBinder binder = reply.readStrongBinder();
