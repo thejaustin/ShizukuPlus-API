@@ -9,7 +9,7 @@ Shizuku+-API eliminates the boilerplate associated with standard Shizuku develop
 *   **Synchronous Shell Execution**: No more managing `InputStream`, `ErrorStream`, and threads. Get a clean `CommandResult` in one line.
 *   **High-Level Utilities**: Dedicated classes for managing **System Settings**, **Package Installation**, and **System Overlays (RRO)**.
 *   **Dhizuku (Device Owner) Integration**: Directly access the `DevicePolicyManager` binder without requiring the user to perform a factory reset or complex ADB setup.
-*   **Universal Compatibility**: Automatically detects if the server is Shizuku+ or standard Shizuku. It uses optimized paths for Shizuku+ and provides a transparent fallback (via `SafeShell`) for original Shizuku servers.
+*   **Universal Compatibility**: Automatically detects if the server is Shizuku+ or standard Shizuku. Uses direct AIDL stubs for Plus servers; falls back to `Shizuku.newProcess` shell execution on standard Shizuku.
 
 ## 🚀 Plus API Features
 
@@ -72,43 +72,48 @@ dependencies {
 ## 🛠️ Usage Examples
 
 ### 1. Unified Shell
-Execute any command and get the output synchronously:
+Execute any command and get the output synchronously (call off the main thread):
 ```java
-CommandResult result = Shizuku+API.Shell.executeCommand("whoami");
+// String shorthand
+ShizukuPlusAPI.CommandResult result = ShizukuPlusAPI.executeShell("whoami");
 if (result.isSuccess()) {
     Log.d("API", "Output: " + result.output);
 }
+
+// Explicit arg array (preferred — avoids shell-quoting issues)
+ShizukuPlusAPI.CommandResult result2 = ShizukuPlusAPI.executeShell(
+    new String[]{"pm", "list", "packages", "-3"});
 ```
 
 ### 2. System Settings
 Easily read or modify `system`, `secure`, and `global` settings:
 ```java
-Shizuku+API.Settings.putSecure("now_bar_enabled", "1");
-String battery = Shizuku+API.Settings.getSystem("font_scale");
+ShizukuPlusAPI.Settings.putSecure("now_bar_enabled", "1");
+String scale = ShizukuPlusAPI.Settings.getSystem("font_scale");
 ```
 
 ### 3. Advanced Window Control
 Force an app into free-form mode even if restricted by its manifest:
 ```java
-IWindowManagerPlus wm = Shizuku+API.getWindowManagerPlus();
-wm.forceResizable("com.example.app", true);
+ShizukuPlusAPI.WindowManager.forceResizable("com.example.app", true);
 ```
 
 ### 4. Storage Access
 Access a file in an app's private data directory (requires user confirmation):
 ```java
-IStorageProxy storage = Shizuku+API.getStorageProxy();
-ParcelFileDescriptor pfd = storage.openFile("/data/data/com.example.app/files/config.json", ParcelFileDescriptor.MODE_READ_ONLY);
+ParcelFileDescriptor pfd = ShizukuPlusAPI.StorageProxy.openFile(
+    "/data/data/com.example.app/files/config.json",
+    ParcelFileDescriptor.MODE_READ_ONLY);
 ```
 
 ## 🔄 Compatibility
 
-Shizuku+-API is built on a **Translation Layer**. 
+Shizuku+-API dispatches through the AIDL stub (`IShizukuService`) when a Plus
+server is detected, giving direct typed access to all Plus interfaces with no
+magic transaction codes. On a standard Shizuku server the shell helpers fall
+back to `Shizuku.newProcess`; Plus-only AIDL features return `null`/`false`.
 
-*   **On Shizuku+**: Uses optimized Binder transactions for maximum speed and access to exclusive Plus APIs.
-*   **On standard Shizuku**: Automatically wraps commands into `Shizuku.newProcess` shell scripts behind the scenes. 
-
-**Result**: Your app works everywhere, but runs better on Shizuku+.
+**Result**: Your app works everywhere, but gets richer capabilities on Shizuku+.
 
 ## 📱 Documentation & Original API
 For the core logic, `UserService` documentation, and AIDL definitions, please refer to the original [Shizuku-API](https://github.com/RikkaApps/Shizuku-API) repository. Shizuku+-API includes all original `rikka.shizuku.Shizuku` methods.

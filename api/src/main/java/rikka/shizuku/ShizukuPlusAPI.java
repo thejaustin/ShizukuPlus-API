@@ -1,802 +1,617 @@
 package rikka.shizuku;
 
-import android.os.IBinder;
 import android.os.Bundle;
-import android.os.Parcel;
+import android.os.IBinder;
+import android.os.ParcelFileDescriptor;
 import android.os.RemoteException;
-import android.graphics.Rect;
+import android.graphics.Bitmap;
 import android.util.Log;
-import androidx.annotation.Nullable;
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
-import java.util.List;
 import java.util.Collections;
-import android.graphics.Bitmap;
-import android.os.ParcelFileDescriptor;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 import af.shizuku.server.IActivityManagerPlus;
-import af.shizuku.server.IWindowManagerPlus;
-import af.shizuku.server.IOverlayManagerPlus;
-import af.shizuku.server.INetworkGovernorPlus;
 import af.shizuku.server.IAICorePlus;
 import af.shizuku.server.IContinuityBridge;
-import af.shizuku.server.IVirtualMachineManager;
+import af.shizuku.server.INetworkGovernorPlus;
+import af.shizuku.server.IOverlayManagerPlus;
+import af.shizuku.server.IShizukuService;
 import af.shizuku.server.IStorageProxy;
+import af.shizuku.server.IVirtualMachineManager;
+import af.shizuku.server.IWindowManagerPlus;
 
 /**
- * Shizuku+API provides extended features for Shizuku+,
- * including Dhizuku (Device Owner) compatibility and enhanced server communication.
+ * Shizuku+API — extended features available when the connected Shizuku server
+ * is a Shizuku+ build with enhanced API enabled.
+ *
+ * <p>All methods that touch a remote binder are safe to call from any thread.
+ * They return {@code null}/{@code false}/empty-list when Shizuku is not
+ * connected, the enhanced API is not supported, or a transient IPC error occurs.
  */
 public class ShizukuPlusAPI {
     private static final String TAG = "Shizuku+API";
 
+    /** Timeout for blocking shell-command reads, in seconds. */
+    private static final long SHELL_TIMEOUT_SECONDS = 30;
+
+    // -------------------------------------------------------------------------
+    // Core connection helpers
+    // -------------------------------------------------------------------------
+
     /**
-     * Check if the connected server supports Shizuku+ Enhanced API features.
-     *
-     * @return true if the server is Shizuku+ and has enhanced API enabled.
+     * Returns {@code true} if the connected server is a Shizuku+ build that
+     * has the enhanced API enabled. Safe to call from any thread.
      */
     public static boolean isEnhancedApiSupported() {
         return Shizuku.isCustomApiEnabled();
     }
 
-    private static <T> T getPlusInterface(int code, android.os.IInterface creator) {
-        if (!isEnhancedApiSupported()) return null;
-        IBinder serviceBinder = Shizuku.getBinder();
-        if (serviceBinder == null) return null; // Shizuku not connected
-        Parcel data = Parcel.obtain();
-        Parcel reply = Parcel.obtain();
+    /**
+     * Returns a live {@link IShizukuService} proxy, or {@code null} if
+     * Shizuku is not connected or the binder has died.
+     */
+    @Nullable
+    private static IShizukuService getShizukuService() {
         try {
-            data.writeInterfaceToken("moe.shizuku.server.IShizukuService");
-            if (serviceBinder.transact(code, data, reply, 0)) {
-                reply.readException();
-                IBinder binder = reply.readStrongBinder();
-                if (binder != null) {
-                    return (T) binder;
-                }
-            }
-        } catch (RemoteException e) {
-            Log.w(TAG, "getPlusInterface: binder transaction failed", e);
-        } finally {
-            reply.recycle();
-            data.recycle();
+            IBinder binder = Shizuku.getBinder();
+            if (binder == null || !binder.isBinderAlive()) return null;
+            return IShizukuService.Stub.asInterface(binder);
+        } catch (Exception e) {
+            Log.w(TAG, "getShizukuService: failed to obtain binder", e);
+            return null;
         }
-        return null;
     }
 
     /**
-     * Internal utility for safe command execution with legacy fallback.
+     * Returns a live {@link IShizukuService} proxy only when the enhanced API
+     * is confirmed active, or {@code null} otherwise.
      */
-    private static class SafeShell {
-        @NonNull
-        static Shell.CommandResult run(@NonNull String[] cmd) {
-            // If the server is Shizuku+, use the optimized synchronous path
-            if (isEnhancedApiSupported()) {
-                return Shell.executeCommand(cmd);
-            }
-            
-            // Legacy Fallback: Manually manage Shizuku.newProcess (this allows the API to work on old Shizuku)
-            try {
-                java.lang.reflect.Method method = Shizuku.class.getDeclaredMethod("newProcess", String[].class, String[].class, String.class);
-                method.setAccessible(true);
-                ShizukuRemoteProcess process = (ShizukuRemoteProcess) method.invoke(null, cmd, null, null);
-                if (process == null) return new Shell.CommandResult(-1, "", "Legacy process creation failed");
+    @Nullable
+    private static IShizukuService requirePlusService() {
+        if (!isEnhancedApiSupported()) return null;
+        return getShizukuService();
+    }
 
-                StringBuilder output = new StringBuilder();
-                try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
+    // -------------------------------------------------------------------------
+    // Shell
+    // -------------------------------------------------------------------------
+
+    /** Result of a synchronous shell command execution. */
+    public static class CommandResult {
+        public final int exitCode;
+        @NonNull public final String output;
+        @NonNull public final String error;
+
+        public CommandResult(int exitCode, @NonNull String output, @NonNull String error) {
+            this.exitCode = exitCode;
+            this.output = output;
+            this.error = error;
+        }
+
+        public boolean isSuccess() { return exitCode == 0; }
+    }
+
+    /**
+     * Execute a shell command string (via {@code sh -c}) through Shizuku and
+     * return the result synchronously. Blocks the calling thread for up to
+     * {@link #SHELL_TIMEOUT_SECONDS} seconds before returning an error result.
+     *
+     * <p>Do not call on the main thread.
+     */
+    @NonNull
+    public static CommandResult executeShell(@NonNull String command) {
+        return executeShell(new String[]{"sh", "-c", command});
+    }
+
+    /**
+     * Execute an argument array through Shizuku and return the result
+     * synchronously. Blocks up to {@link #SHELL_TIMEOUT_SECONDS} seconds.
+     *
+     * <p>Do not call on the main thread.
+     */
+    @NonNull
+    public static CommandResult executeShell(@NonNull String[] cmd) {
+        try {
+            // newProcess is the correct public API surface for Shizuku shell execution.
+            ShizukuRemoteProcess process = Shizuku.newProcess(cmd, null, null);
+            if (process == null) {
+                return new CommandResult(-1, "", "Process creation returned null");
+            }
+
+            final StringBuilder output = new StringBuilder();
+            final StringBuilder error  = new StringBuilder();
+
+            // Drain stderr on a parallel thread: if stdout fills the OS pipe
+            // buffer while we block reading it, stderr must drain or we deadlock.
+            Thread stderrThread = new Thread(() -> {
+                try (BufferedReader r = new BufferedReader(
+                        new InputStreamReader(process.getErrorStream(), StandardCharsets.UTF_8))) {
                     String line;
-                    while ((line = reader.readLine()) != null) {
-                        output.append(line).append('\n');
+                    while ((line = r.readLine()) != null) {
+                        error.append(line).append('\n');
                     }
+                } catch (Exception ignored) {}
+            }, "shizuku-stderr");
+            stderrThread.setDaemon(true);
+            stderrThread.start();
+
+            try (BufferedReader r = new BufferedReader(
+                    new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = r.readLine()) != null) {
+                    output.append(line).append('\n');
                 }
-                int exitCode = process.waitFor();
-                return new Shell.CommandResult(exitCode, output.toString().trim(), "");
-            } catch (Exception e) {
-                return new Shell.CommandResult(-1, "", "Fallback failed: " + e.getMessage());
             }
+
+            stderrThread.join(TimeUnit.SECONDS.toMillis(SHELL_TIMEOUT_SECONDS));
+            int exitCode = process.waitFor();
+            return new CommandResult(exitCode, output.toString().trim(), error.toString().trim());
+
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return new CommandResult(-1, "", "Interrupted");
+        } catch (Exception e) {
+            return new CommandResult(-1, "", e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName());
         }
     }
 
-    /**
-     * Synchronously execute a shell command through Shizuku and return the result.
-     * This eliminates the boilerplate of managing streams and processes for simple tasks.
-     */
-    public static class Shell {
+    // -------------------------------------------------------------------------
+    // Settings
+    // -------------------------------------------------------------------------
 
-        public static class CommandResult {
-            public final int exitCode;
-            public final String output;
-            public final String error;
-
-            public CommandResult(int exitCode, String output, String error) {
-                this.exitCode = exitCode;
-                this.output = output;
-                this.error = error;
-            }
-
-            public boolean isSuccess() {
-                return exitCode == 0;
-            }
-        }
-
-        /**
-         * Execute a command string directly via `sh -c`.
-         */
-        @NonNull
-        public static CommandResult executeCommand(@NonNull String command) {
-            return executeCommand(new String[]{"sh", "-c", command});
-        }
-
-        /**
-         * Execute an array of command arguments.
-         */
-        @NonNull
-        public static CommandResult executeCommand(@NonNull String[] cmd) {
-            try {
-                java.lang.reflect.Method method = Shizuku.class.getDeclaredMethod("newProcess", String[].class, String[].class, String.class);
-                method.setAccessible(true);
-                ShizukuRemoteProcess process = (ShizukuRemoteProcess) method.invoke(null, cmd, null, null);
-
-                if (process == null) return new CommandResult(-1, "", "Process creation failed");
-
-                final StringBuilder output = new StringBuilder();
-                final StringBuilder error = new StringBuilder();
-
-                // Drain stderr on a separate thread to prevent pipe deadlock:
-                // if the process fills the stderr OS buffer while we block on stdout, it hangs.
-                Thread stderrThread = new Thread(() -> {
-                    try (BufferedReader reader = new BufferedReader(
-                            new InputStreamReader(process.getErrorStream(), StandardCharsets.UTF_8))) {
-                        String line;
-                        while ((line = reader.readLine()) != null) {
-                            error.append(line).append('\n');
-                        }
-                    } catch (Exception e) {
-                        Log.w("ShizukuPlusAPI", "Failed to read stderr from shell command", e);
-                    }
-                });
-                stderrThread.start();
-
-                try (BufferedReader reader = new BufferedReader(
-                        new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
-                    String line;
-                    while ((line = reader.readLine()) != null) {
-                        output.append(line).append('\n');
-                    }
-                }
-
-                stderrThread.join();
-                int exitCode = process.waitFor();
-                return new CommandResult(exitCode, output.toString().trim(), error.toString().trim());
-            } catch (Exception e) {
-                return new CommandResult(-1, "", e.getMessage() != null ? e.getMessage() : "Unknown exception");
-            }
-        }
-    }
-
-    /**
-     * Easy wrappers for managing Android System settings (system, secure, global) via Shizuku.
-     */
+    /** Wrappers for Android System settings (system / secure / global). */
     public static class Settings {
 
         public static boolean putSystem(@NonNull String key, @NonNull String value) {
-            return SafeShell.run(new String[]{"settings", "put", "system", key, value}).isSuccess();
+            return executeShell(new String[]{"settings", "put", "system", key, value}).isSuccess();
         }
 
         public static boolean putSecure(@NonNull String key, @NonNull String value) {
-            return SafeShell.run(new String[]{"settings", "put", "secure", key, value}).isSuccess();
+            return executeShell(new String[]{"settings", "put", "secure", key, value}).isSuccess();
         }
 
         public static boolean putGlobal(@NonNull String key, @NonNull String value) {
-            return SafeShell.run(new String[]{"settings", "put", "global", key, value}).isSuccess();
+            return executeShell(new String[]{"settings", "put", "global", key, value}).isSuccess();
         }
 
         @NonNull
         public static String getSystem(@NonNull String key) {
-            return SafeShell.run(new String[]{"settings", "get", "system", key}).output;
+            return executeShell(new String[]{"settings", "get", "system", key}).output;
         }
-        
+
         @NonNull
         public static String getSecure(@NonNull String key) {
-            return SafeShell.run(new String[]{"settings", "get", "secure", key}).output;
+            return executeShell(new String[]{"settings", "get", "secure", key}).output;
         }
 
         @NonNull
         public static String getGlobal(@NonNull String key) {
-            return SafeShell.run(new String[]{"settings", "get", "global", key}).output;
+            return executeShell(new String[]{"settings", "get", "global", key}).output;
         }
     }
 
-    /**
-     * Easy wrappers for Package Manager operations.
-     */
+    // -------------------------------------------------------------------------
+    // Package Manager
+    // -------------------------------------------------------------------------
+
+    /** Wrappers for package-manager operations via Shizuku. */
     public static class PackageManager {
 
-        /**
-         * Install an APK file using the pm command via Shizuku.
-         * 
-         * @param apkFilePath The absolute path to the APK file.
-         * @return true if installation succeeded.
-         */
         public static boolean installPackage(@NonNull String apkFilePath) {
-            return SafeShell.run(new String[]{"pm", "install", "-r", apkFilePath}).isSuccess();
+            return executeShell(new String[]{"pm", "install", "-r", apkFilePath}).isSuccess();
         }
 
-        /**
-         * Uninstall a package.
-         * 
-         * @param packageName The package name to uninstall.
-         * @return true if uninstallation succeeded.
-         */
         public static boolean uninstallPackage(@NonNull String packageName) {
-            return SafeShell.run(new String[]{"pm", "uninstall", packageName}).isSuccess();
+            return executeShell(new String[]{"pm", "uninstall", packageName}).isSuccess();
         }
-        
-        /**
-         * Clear data for a specific package.
-         */
+
         public static boolean clearPackageData(@NonNull String packageName) {
-            return SafeShell.run(new String[]{"pm", "clear", packageName}).isSuccess();
+            return executeShell(new String[]{"pm", "clear", packageName}).isSuccess();
         }
     }
 
-    /**
-     * Easy wrappers for managing System Overlays (RRO).
-     */
+    // -------------------------------------------------------------------------
+    // OverlayManager — requires enhanced API
+    // -------------------------------------------------------------------------
+
+    /** Runtime resource overlay (RRO) management via the Plus AIDL. */
     public static class OverlayManager {
 
         @Nullable
         private static IOverlayManagerPlus getService() {
-            IBinder binder = getPlusInterface(113, null);
-            return binder != null ? IOverlayManagerPlus.Stub.asInterface(binder) : null;
+            IShizukuService svc = requirePlusService();
+            if (svc == null) return null;
+            try { return svc.getOverlayManagerPlus(); }
+            catch (RemoteException e) { Log.w(TAG, "getOverlayManagerPlus", e); return null; }
         }
 
-        /**
-         * Enable a system overlay.
-         */
         public static boolean enableOverlay(@NonNull String packageName) {
-            IOverlayManagerPlus service = getService();
-            if (service != null) {
-                try {
-                    return service.setOverlayEnabled(packageName, true);
-                } catch (RemoteException e) {
-                    Log.w(TAG, "Failed to enable overlay " + packageName, e);
-                }
+            IOverlayManagerPlus s = getService();
+            if (s != null) {
+                try { return s.setOverlayEnabled(packageName, true); }
+                catch (RemoteException e) { Log.w(TAG, "enableOverlay " + packageName, e); }
             }
-            return SafeShell.run(new String[]{"cmd", "overlay", "enable", "--user", "current", packageName}).isSuccess();
+            return executeShell(new String[]{"cmd", "overlay", "enable", "--user", "current", packageName}).isSuccess();
         }
 
-        /**
-         * Disable a system overlay.
-         */
         public static boolean disableOverlay(@NonNull String packageName) {
-            IOverlayManagerPlus service = getService();
-            if (service != null) {
-                try {
-                    return service.setOverlayEnabled(packageName, false);
-                } catch (RemoteException e) {
-                    Log.w(TAG, "Failed to disable overlay " + packageName, e);
-                }
+            IOverlayManagerPlus s = getService();
+            if (s != null) {
+                try { return s.setOverlayEnabled(packageName, false); }
+                catch (RemoteException e) { Log.w(TAG, "disableOverlay " + packageName, e); }
             }
-            return SafeShell.run(new String[]{"cmd", "overlay", "disable", "--user", "current", packageName}).isSuccess();
+            return executeShell(new String[]{"cmd", "overlay", "disable", "--user", "current", packageName}).isSuccess();
         }
-        
-        /**
-         * Set the priority of an overlay.
-         */
-        public static boolean setPriority(@NonNull String packageName, @NonNull String parentPackageName) {
-            IOverlayManagerPlus service = getService();
-            if (service != null) {
-                try {
-                    // Note: setHighestPriority only takes one arg in AIDL for now
-                    return service.setHighestPriority(packageName);
-                } catch (RemoteException e) {
-                    Log.w(TAG, "Failed to set priority for overlay " + packageName, e);
-                }
+
+        public static boolean setHighestPriority(@NonNull String packageName) {
+            IOverlayManagerPlus s = getService();
+            if (s != null) {
+                try { return s.setHighestPriority(packageName); }
+                catch (RemoteException e) { Log.w(TAG, "setHighestPriority " + packageName, e); }
             }
-            return SafeShell.run(new String[]{"cmd", "overlay", "set-priority", packageName, parentPackageName}).isSuccess();
+            return false;
         }
 
         @NonNull
         public static List<String> getAllOverlays() {
-            IOverlayManagerPlus service = getService();
-            if (service != null) {
-                try {
-                    return service.getAllOverlays();
-                } catch (RemoteException e) {
-                    Log.w(TAG, "Failed to get all overlays", e);
-                }
+            IOverlayManagerPlus s = getService();
+            if (s != null) {
+                try { return s.getAllOverlays(); }
+                catch (RemoteException e) { Log.w(TAG, "getAllOverlays", e); }
             }
             return Collections.emptyList();
         }
 
-        /**
-         * Inject a dynamic resource overlay (Android 12+).
-         */
-        public static boolean injectResourceOverlay(@NonNull String targetPackage, @NonNull String resourceName, int type, @NonNull String value) {
-            IOverlayManagerPlus service = getService();
-            if (service != null) {
-                try {
-                    return service.injectResourceOverlay(targetPackage, resourceName, type, value);
-                } catch (RemoteException e) {
-                    Log.w(TAG, "Failed to inject resource overlay for " + targetPackage, e);
-                }
+        public static boolean injectResourceOverlay(
+                @NonNull String targetPackage, @NonNull String resourceName,
+                int type, @NonNull String value) {
+            IOverlayManagerPlus s = getService();
+            if (s != null) {
+                try { return s.injectResourceOverlay(targetPackage, resourceName, type, value); }
+                catch (RemoteException e) { Log.w(TAG, "injectResourceOverlay " + targetPackage, e); }
             }
             return false;
         }
     }
 
-    /**
-     * Advanced Activity Manager features.
-     */
+    // -------------------------------------------------------------------------
+    // ActivityManager — requires enhanced API
+    // -------------------------------------------------------------------------
+
+    /** Advanced Activity Manager operations. */
     public static class ActivityManager {
+
         @Nullable
         private static IActivityManagerPlus getService() {
-            IBinder binder = getPlusInterface(115, null);
-            return binder != null ? IActivityManagerPlus.Stub.asInterface(binder) : null;
+            IShizukuService svc = requirePlusService();
+            if (svc == null) return null;
+            try { return svc.getActivityManagerPlus(); }
+            catch (RemoteException e) { Log.w(TAG, "getActivityManagerPlus", e); return null; }
         }
 
         public static boolean deepForceStop(@NonNull String packageName) {
-            IActivityManagerPlus service = getService();
-            if (service != null) {
-                try {
-                    return service.deepForceStop(packageName);
-                } catch (RemoteException e) {
-                    Log.w(TAG, "Failed to deep force stop " + packageName, e);
-                }
+            IActivityManagerPlus s = getService();
+            if (s != null) {
+                try { return s.deepForceStop(packageName); }
+                catch (RemoteException e) { Log.w(TAG, "deepForceStop " + packageName, e); }
             }
-            return SafeShell.run(new String[]{"am", "force-stop", packageName}).isSuccess();
+            return executeShell(new String[]{"am", "force-stop", packageName}).isSuccess();
         }
 
         public static boolean killAllBackgroundProcesses() {
-            IActivityManagerPlus service = getService();
-            if (service != null) {
-                try {
-                    return service.killAllBackgroundProcesses();
-                } catch (RemoteException e) {
-                    Log.w(TAG, "Failed to kill all background processes", e);
-                }
-            }
-            return false;
+            IActivityManagerPlus s = getService();
+            if (s == null) return false;
+            try { return s.killAllBackgroundProcesses(); }
+            catch (RemoteException e) { Log.w(TAG, "killAllBackgroundProcesses", e); return false; }
         }
 
-        /**
-         * Set the standby bucket for an app (e.g., ACTIVE, WORKING_SET, FREQUENT, RARE, RESTRICTED).
-         */
         public static boolean setAppStandbyBucket(@NonNull String packageName, int bucket) {
-            IActivityManagerPlus service = getService();
-            if (service != null) {
-                try {
-                    return service.setAppStandbyBucket(packageName, bucket);
-                } catch (RemoteException e) {
-                    Log.w(TAG, "Failed to set standby bucket for " + packageName, e);
-                }
-            }
-            return false;
+            IActivityManagerPlus s = getService();
+            if (s == null) return false;
+            try { return s.setAppStandbyBucket(packageName, bucket); }
+            catch (RemoteException e) { Log.w(TAG, "setAppStandbyBucket " + packageName, e); return false; }
         }
     }
 
-    /**
-     * Advanced Window Manager and Desktop Mode features.
-     */
+    // -------------------------------------------------------------------------
+    // WindowManager — requires enhanced API
+    // -------------------------------------------------------------------------
+
+    /** Window Manager and desktop-mode features. */
     public static class WindowManager {
+
         @Nullable
         private static IWindowManagerPlus getService() {
-            IBinder binder = getPlusInterface(110, null);
-            return binder != null ? IWindowManagerPlus.Stub.asInterface(binder) : null;
+            IShizukuService svc = requirePlusService();
+            if (svc == null) return null;
+            try { return svc.getWindowManagerPlus(); }
+            catch (RemoteException e) { Log.w(TAG, "getWindowManagerPlus", e); return null; }
         }
 
         public static void forceResizable(@NonNull String packageName, boolean enabled) {
-            IWindowManagerPlus service = getService();
-            if (service != null) {
-                try {
-                    service.forceResizable(packageName, enabled);
-                } catch (RemoteException e) {
-                    Log.w(TAG, "Failed to force resizable for " + packageName, e);
-                }
-            }
+            IWindowManagerPlus s = getService();
+            if (s == null) return;
+            try { s.forceResizable(packageName, enabled); }
+            catch (RemoteException e) { Log.w(TAG, "forceResizable " + packageName, e); }
         }
 
         public static void setAlwaysOnTop(int taskId, boolean enabled) {
-            IWindowManagerPlus service = getService();
-            if (service != null) {
-                try {
-                    service.setAlwaysOnTop(taskId, enabled);
-                } catch (RemoteException e) {
-                    Log.w(TAG, "Failed to set always on top for task " + taskId, e);
-                }
-            }
+            IWindowManagerPlus s = getService();
+            if (s == null) return;
+            try { s.setAlwaysOnTop(taskId, enabled); }
+            catch (RemoteException e) { Log.w(TAG, "setAlwaysOnTop task=" + taskId, e); }
         }
     }
 
-    /**
-     * Privileged Network and DNS management.
-     */
+    // -------------------------------------------------------------------------
+    // NetworkGovernor — requires enhanced API
+    // -------------------------------------------------------------------------
+
+    /** Privileged network and DNS management. */
     public static class NetworkGovernor {
+
         @Nullable
         private static INetworkGovernorPlus getService() {
-            IBinder binder = getPlusInterface(114, null);
-            return binder != null ? INetworkGovernorPlus.Stub.asInterface(binder) : null;
+            IShizukuService svc = requirePlusService();
+            if (svc == null) return null;
+            try { return svc.getNetworkGovernorPlus(); }
+            catch (RemoteException e) { Log.w(TAG, "getNetworkGovernorPlus", e); return null; }
         }
 
         public static boolean setPrivateDns(@Nullable String mode, @Nullable String hostname) {
-            INetworkGovernorPlus service = getService();
-            if (service != null) {
-                try {
-                    return service.setPrivateDns(mode, hostname);
-                } catch (RemoteException e) {
-                    Log.w(TAG, "Failed to set private DNS mode=" + mode + " hostname=" + hostname, e);
-                }
-            }
-            return false;
+            INetworkGovernorPlus s = getService();
+            if (s == null) return false;
+            try { return s.setPrivateDns(mode, hostname); }
+            catch (RemoteException e) { Log.w(TAG, "setPrivateDns", e); return false; }
         }
 
-        /**
-         * Add a package to the system's restricted network list (firewall).
-         */
         public static boolean restrictAppNetwork(@NonNull String packageName, boolean restricted) {
-            INetworkGovernorPlus service = getService();
-            if (service != null) {
-                try {
-                    return service.restrictAppNetwork(packageName, restricted);
-                } catch (RemoteException e) {
-                    Log.w(TAG, "Failed to restrict app network for " + packageName, e);
-                }
-            }
-            return false;
+            INetworkGovernorPlus s = getService();
+            if (s == null) return false;
+            try { return s.restrictAppNetwork(packageName, restricted); }
+            catch (RemoteException e) { Log.w(TAG, "restrictAppNetwork " + packageName, e); return false; }
         }
 
-        /**
-         * Get the current network restriction state for a package.
-         */
         public static boolean isAppNetworkRestricted(@NonNull String packageName) {
-            INetworkGovernorPlus service = getService();
-            if (service != null) {
-                try {
-                    return service.isAppNetworkRestricted(packageName);
-                } catch (RemoteException e) {
-                    Log.w(TAG, "Failed to get app network restricted state for " + packageName, e);
-                }
-            }
-            return false;
+            INetworkGovernorPlus s = getService();
+            if (s == null) return false;
+            try { return s.isAppNetworkRestricted(packageName); }
+            catch (RemoteException e) { Log.w(TAG, "isAppNetworkRestricted " + packageName, e); return false; }
         }
     }
 
-    /**
-     * Intelligence Bridge (AI) and screen-aware features.
-     */
+    // -------------------------------------------------------------------------
+    // AICore — requires enhanced API
+    // -------------------------------------------------------------------------
+
+    /** AI and screen-aware features (pixel inspection, input simulation, etc.). */
     public static class AICore {
+
         @Nullable
         private static IAICorePlus getService() {
-            IBinder binder = getPlusInterface(109, null);
-            return binder != null ? IAICorePlus.Stub.asInterface(binder) : null;
+            IShizukuService svc = requirePlusService();
+            if (svc == null) return null;
+            try { return svc.getAICorePlus(); }
+            catch (RemoteException e) { Log.w(TAG, "getAICorePlus", e); return null; }
         }
 
         public static int getPixelColor(int x, int y) {
-            IAICorePlus service = getService();
-            if (service != null) {
-                try {
-                    return service.getPixelColor(x, y);
-                } catch (RemoteException e) {
-                    Log.w(TAG, "Failed to get pixel color at (" + x + ", " + y + ")", e);
-                }
-            }
-            return 0;
+            IAICorePlus s = getService();
+            if (s == null) return 0;
+            try { return s.getPixelColor(x, y); }
+            catch (RemoteException e) { Log.w(TAG, "getPixelColor", e); return 0; }
         }
 
-        /**
-         * Schedule a high-priority task on the Neural Processing Unit (NPU).
-         */
         @Nullable
         public static Bundle scheduleNPULoad(@NonNull Bundle taskData) {
-            IAICorePlus service = getService();
-            if (service != null) {
-                try {
-                    return service.scheduleNPULoad(taskData);
-                } catch (RemoteException e) {
-                    Log.w(TAG, "Failed to schedule NPU load", e);
-                }
-            }
-            return null;
+            IAICorePlus s = getService();
+            if (s == null) return null;
+            try { return s.scheduleNPULoad(taskData); }
+            catch (RemoteException e) { Log.w(TAG, "scheduleNPULoad", e); return null; }
         }
 
-        /**
-         * Capture a privileged screenshot of a specific window/layer for AI analysis.
-         */
         @Nullable
         public static Bitmap captureLayer(int layerId) {
-            IAICorePlus service = getService();
-            if (service != null) {
-                try {
-                    return service.captureLayer(layerId);
-                } catch (RemoteException e) {
-                    Log.w(TAG, "Failed to capture layer " + layerId, e);
-                }
-            }
-            return null;
+            IAICorePlus s = getService();
+            if (s == null) return null;
+            try { return s.captureLayer(layerId); }
+            catch (RemoteException e) { Log.w(TAG, "captureLayer " + layerId, e); return null; }
         }
 
-        /**
-         * Get current system intelligence context (detected entities, screen text).
-         */
         @Nullable
         public static Bundle getSystemContext() {
-            IAICorePlus service = getService();
-            if (service != null) {
-                try {
-                    return service.getSystemContext();
-                } catch (RemoteException e) {
-                    Log.w(TAG, "Failed to get system context", e);
-                }
-            }
-            return null;
+            IAICorePlus s = getService();
+            if (s == null) return null;
+            try { return s.getSystemContext(); }
+            catch (RemoteException e) { Log.w(TAG, "getSystemContext", e); return null; }
         }
 
-        /**
-         * Simulate a physical touch on the screen.
-         */
         public static boolean simulateTouch(float x, float y) {
-            IAICorePlus service = getService();
-            if (service != null) {
-                try {
-                    return service.simulateTouch(x, y);
-                } catch (RemoteException e) {
-                    Log.w(TAG, "Failed to simulate touch", e);
-                }
-            }
-            return false;
+            IAICorePlus s = getService();
+            if (s == null) return false;
+            try { return s.simulateTouch(x, y); }
+            catch (RemoteException e) { Log.w(TAG, "simulateTouch", e); return false; }
         }
 
-        /**
-         * Simulate a swipe gesture on the screen.
-         */
-        public static boolean simulateSwipe(float x1, float y1, float x2, float y2, int duration) {
-            IAICorePlus service = getService();
-            if (service != null) {
-                try {
-                    return service.simulateSwipe(x1, y1, x2, y2, duration);
-                } catch (RemoteException e) {
-                    Log.w(TAG, "Failed to simulate swipe", e);
-                }
-            }
-            return false;
+        public static boolean simulateSwipe(float x1, float y1, float x2, float y2, int durationMs) {
+            IAICorePlus s = getService();
+            if (s == null) return false;
+            try { return s.simulateSwipe(x1, y1, x2, y2, durationMs); }
+            catch (RemoteException e) { Log.w(TAG, "simulateSwipe", e); return false; }
         }
 
-        /**
-         * Simulate typing text input.
-         */
         public static boolean simulateText(@NonNull String text) {
-            IAICorePlus service = getService();
-            if (service != null) {
-                try {
-                    return service.simulateText(text);
-                } catch (RemoteException e) {
-                    Log.w(TAG, "Failed to simulate text", e);
-                }
-            }
-            return false;
+            IAICorePlus s = getService();
+            if (s == null) return false;
+            try { return s.simulateText(text); }
+            catch (RemoteException e) { Log.w(TAG, "simulateText", e); return false; }
         }
 
-        /**
-         * Get the current window hierarchy (UI elements and text) for AI parsing.
-         */
         @Nullable
         public static String getWindowHierarchy() {
-            IAICorePlus service = getService();
-            if (service != null) {
-                try {
-                    return service.getWindowHierarchy();
-                } catch (RemoteException e) {
-                    Log.w(TAG, "Failed to get window hierarchy", e);
-                }
-            }
-            return null;
+            IAICorePlus s = getService();
+            if (s == null) return null;
+            try { return s.getWindowHierarchy(); }
+            catch (RemoteException e) { Log.w(TAG, "getWindowHierarchy", e); return null; }
         }
     }
 
-    /**
-     * Multi-device privileged continuity features.
-     */
+    // -------------------------------------------------------------------------
+    // Continuity — requires enhanced API
+    // -------------------------------------------------------------------------
+
+    /** Multi-device privileged continuity features. */
     public static class Continuity {
+
         @Nullable
         private static IContinuityBridge getService() {
-            IBinder binder = getPlusInterface(111, null);
-            return binder != null ? IContinuityBridge.Stub.asInterface(binder) : null;
+            IShizukuService svc = requirePlusService();
+            if (svc == null) return null;
+            try { return svc.getContinuityBridge(); }
+            catch (RemoteException e) { Log.w(TAG, "getContinuityBridge", e); return null; }
         }
 
         @NonNull
         public static List<String> listEligibleDevices() {
-            IContinuityBridge service = getService();
-            if (service != null) {
-                try {
-                    return service.listEligibleDevices();
-                } catch (RemoteException e) {
-                    Log.w(TAG, "Failed to list eligible devices", e);
-                }
-            }
-            return Collections.emptyList();
+            IContinuityBridge s = getService();
+            if (s == null) return Collections.emptyList();
+            try { return s.listEligibleDevices(); }
+            catch (RemoteException e) { Log.w(TAG, "listEligibleDevices", e); return Collections.emptyList(); }
         }
     }
 
-    /**
-     * Virtual Machine Manager (AVF) for Linux/Microdroid.
-     */
+    // -------------------------------------------------------------------------
+    // VirtualMachine — requires enhanced API
+    // -------------------------------------------------------------------------
+
+    /** Android Virtualization Framework (AVF) / Microdroid VM management. */
     public static class VirtualMachine {
+
         @Nullable
         private static IVirtualMachineManager getService() {
-            IBinder binder = getPlusInterface(107, null);
-            return binder != null ? IVirtualMachineManager.Stub.asInterface(binder) : null;
+            IShizukuService svc = requirePlusService();
+            if (svc == null) return null;
+            try { return svc.getVirtualMachineManager(); }
+            catch (RemoteException e) { Log.w(TAG, "getVirtualMachineManager", e); return null; }
         }
 
         @NonNull
         public static List<String> list() {
-            IVirtualMachineManager service = getService();
-            if (service != null) {
-                try {
-                    return service.list();
-                } catch (RemoteException e) {
-                    Log.w(TAG, "Failed to list virtual machines", e);
-                }
-            }
-            return Collections.emptyList();
+            IVirtualMachineManager s = getService();
+            if (s == null) return Collections.emptyList();
+            try { return s.list(); }
+            catch (RemoteException e) { Log.w(TAG, "vm list", e); return Collections.emptyList(); }
         }
 
         public static boolean start(@NonNull String name) {
-            IVirtualMachineManager service = getService();
-            if (service != null) {
-                try {
-                    return service.start(name);
-                } catch (RemoteException e) {
-                    Log.w(TAG, "Failed to start virtual machine " + name, e);
-                }
-            }
-            return false;
+            IVirtualMachineManager s = getService();
+            if (s == null) return false;
+            try { return s.start(name); }
+            catch (RemoteException e) { Log.w(TAG, "vm start " + name, e); return false; }
         }
 
         public static boolean stop(@NonNull String name) {
-            IVirtualMachineManager service = getService();
-            if (service != null) {
-                try {
-                    return service.stop(name);
-                } catch (RemoteException e) {
-                    Log.w(TAG, "Failed to stop virtual machine " + name, e);
-                }
-            }
-            return false;
+            IVirtualMachineManager s = getService();
+            if (s == null) return false;
+            try { return s.stop(name); }
+            catch (RemoteException e) { Log.w(TAG, "vm stop " + name, e); return false; }
         }
 
         public static boolean create(@NonNull String name, @NonNull Bundle config) {
-            IVirtualMachineManager service = getService();
-            if (service != null) {
-                try {
-                    return service.create(name, config);
-                } catch (RemoteException e) {
-                    Log.w(TAG, "Failed to create virtual machine " + name, e);
-                }
-            }
-            return false;
+            IVirtualMachineManager s = getService();
+            if (s == null) return false;
+            try { return s.create(name, config); }
+            catch (RemoteException e) { Log.w(TAG, "vm create " + name, e); return false; }
         }
 
         public static boolean delete(@NonNull String name) {
-            IVirtualMachineManager service = getService();
-            if (service != null) {
-                try {
-                    return service.delete(name);
-                } catch (RemoteException e) {
-                    Log.w(TAG, "Failed to delete virtual machine " + name, e);
-                }
-            }
-            return false;
+            IVirtualMachineManager s = getService();
+            if (s == null) return false;
+            try { return s.delete(name); }
+            catch (RemoteException e) { Log.w(TAG, "vm delete " + name, e); return false; }
         }
 
         @Nullable
         public static String getStatus(@NonNull String name) {
-            IVirtualMachineManager service = getService();
-            if (service != null) {
-                try {
-                    return service.getStatus(name);
-                } catch (RemoteException e) {
-                    Log.w(TAG, "Failed to get status of virtual machine " + name, e);
-                }
-            }
-            return null;
+            IVirtualMachineManager s = getService();
+            if (s == null) return null;
+            try { return s.getStatus(name); }
+            catch (RemoteException e) { Log.w(TAG, "vm status " + name, e); return null; }
         }
     }
 
-    /**
-     * Storage Bridge for bypassing Android 16/17 storage restrictions.
-     */
+    // -------------------------------------------------------------------------
+    // StorageProxy — requires enhanced API
+    // -------------------------------------------------------------------------
+
+    /** Privileged file-system operations via the Plus storage bridge. */
     public static class StorageProxy {
+
         @Nullable
         private static IStorageProxy getService() {
-            IBinder binder = getPlusInterface(108, null); // 108 is getStorageProxy
-            return binder != null ? IStorageProxy.Stub.asInterface(binder) : null;
+            IShizukuService svc = requirePlusService();
+            if (svc == null) return null;
+            try { return svc.getStorageProxy(); }
+            catch (RemoteException e) { Log.w(TAG, "getStorageProxy", e); return null; }
         }
 
         public static boolean exists(@NonNull String path) {
-            IStorageProxy service = getService();
-            if (service != null) {
-                try {
-                    return service.exists(path);
-                } catch (RemoteException e) {
-                    Log.w(TAG, "Failed to check if path exists: " + path, e);
-                }
-            }
-            return false;
+            IStorageProxy s = getService();
+            if (s == null) return false;
+            try { return s.exists(path); }
+            catch (RemoteException e) { Log.w(TAG, "exists " + path, e); return false; }
         }
 
         public static boolean delete(@NonNull String path) {
-            IStorageProxy service = getService();
-            if (service != null) {
-                try {
-                    return service.delete(path);
-                } catch (RemoteException e) {
-                    Log.w(TAG, "Failed to delete path: " + path, e);
-                }
-            }
-            return false;
+            IStorageProxy s = getService();
+            if (s == null) return false;
+            try { return s.delete(path); }
+            catch (RemoteException e) { Log.w(TAG, "delete " + path, e); return false; }
         }
 
         @Nullable
         public static ParcelFileDescriptor openFile(@NonNull String path, int mode) {
-            IStorageProxy service = getService();
-            if (service != null) {
-                try {
-                    return service.openFile(path, mode);
-                } catch (RemoteException e) {
-                    Log.w(TAG, "Failed to open file: " + path, e);
-                }
-            }
-            return null;
+            IStorageProxy s = getService();
+            if (s == null) return null;
+            try { return s.openFile(path, mode); }
+            catch (RemoteException e) { Log.w(TAG, "openFile " + path, e); return null; }
         }
 
         @Nullable
         public static List<String> listFiles(@NonNull String path) {
-            IStorageProxy service = getService();
-            if (service != null) {
-                try {
-                    return service.listFiles(path);
-                } catch (RemoteException e) {
-                    Log.w(TAG, "Failed to list files in: " + path, e);
-                }
-            }
-            return null;
+            IStorageProxy s = getService();
+            if (s == null) return null;
+            try { return s.listFiles(path); }
+            catch (RemoteException e) { Log.w(TAG, "listFiles " + path, e); return null; }
         }
 
         @Nullable
         public static Bundle getFileInfo(@NonNull String path) {
-            IStorageProxy service = getService();
-            if (service != null) {
-                try {
-                    return service.getFileInfo(path);
-                } catch (RemoteException e) {
-                    Log.w(TAG, "Failed to get file info for: " + path, e);
-                }
-            }
-            return null;
+            IStorageProxy s = getService();
+            if (s == null) return null;
+            try { return s.getFileInfo(path); }
+            catch (RemoteException e) { Log.w(TAG, "getFileInfo " + path, e); return null; }
         }
     }
 
-    /**
-     * Compatibility layer for Dhizuku (Device Owner) features.
-     */
+    // -------------------------------------------------------------------------
+    // Dhizuku — Device Owner compatibility
+    // -------------------------------------------------------------------------
+
+    /** Dhizuku (Device Owner) compatibility layer exposed by the Plus server. */
     public static class Dhizuku {
-        
-        /**
-         * Get the DevicePolicyManager binder shared by Shizuku+.
-         * 
-         * @return The DPM binder if available and Shizuku+ is in Dhizuku mode.
-         */
+
         @Nullable
         public static IBinder getBinder() {
             return Shizuku.Dhizuku.getBinder();
         }
 
-        /**
-         * Check if Dhizuku mode is active on the current Shizuku+ server.
-         */
         public static boolean isAvailable() {
             return getBinder() != null;
         }
