@@ -21,7 +21,7 @@ import af.shizuku.server.IAICorePlus;
 import af.shizuku.server.IContinuityBridge;
 import af.shizuku.server.INetworkGovernorPlus;
 import af.shizuku.server.IOverlayManagerPlus;
-import af.shizuku.server.IShizukuService;
+import moe.shizuku.server.IShizukuService;
 import af.shizuku.server.IStorageProxy;
 import af.shizuku.server.IVirtualMachineManager;
 import af.shizuku.server.IWindowManagerPlus;
