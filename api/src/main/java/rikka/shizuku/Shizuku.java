@@ -35,17 +35,17 @@ import moe.shizuku.server.IShizukuService;
 
 public class Shizuku {
 
-    private static IBinder binder;
-    private static IShizukuService service;
+    private static volatile IBinder binder;
+    private static volatile IShizukuService service;
 
-    private static int serverUid = -1;
-    private static int serverApiVersion = -1;
-    private static int serverPatchVersion = -1;
-    private static String serverContext = null;
-    private static boolean permissionGranted = false;
-    private static boolean shouldShowRequestPermissionRationale = false;
-    private static boolean preV11 = false;
-    private static boolean binderReady = false;
+    private static volatile int serverUid = -1;
+    private static volatile int serverApiVersion = -1;
+    private static volatile int serverPatchVersion = -1;
+    private static volatile String serverContext = null;
+    private static volatile boolean permissionGranted = false;
+    private static volatile boolean shouldShowRequestPermissionRationale = false;
+    private static volatile boolean preV11 = false;
+    private static volatile boolean binderReady = false;
 
     private static final IShizukuApplication SHIZUKU_APPLICATION = new IShizukuApplication.Stub() {
 
