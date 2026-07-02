@@ -30,14 +30,14 @@ public final class AppBinderCompat {
         try {
             application.bindApplication(reply);
         } catch (Throwable e) {
-            LOGGER.w("bindApplication via af descriptor failed");
+            LOGGER.w(e, "bindApplication via af descriptor failed");
         }
         try {
             moe.shizuku.server.IShizukuApplication.Stub
                     .asInterface(application.asBinder())
                     .bindApplication(reply);
         } catch (Throwable e) {
-            LOGGER.w("bindApplication via moe descriptor failed");
+            LOGGER.w(e, "bindApplication via moe descriptor failed");
         }
     }
 
@@ -46,14 +46,14 @@ public final class AppBinderCompat {
         try {
             application.dispatchRequestPermissionResult(requestCode, reply);
         } catch (Throwable e) {
-            LOGGER.w("dispatchRequestPermissionResult via af descriptor failed");
+            LOGGER.w(e, "dispatchRequestPermissionResult via af descriptor failed");
         }
         try {
             moe.shizuku.server.IShizukuApplication.Stub
                     .asInterface(application.asBinder())
                     .dispatchRequestPermissionResult(requestCode, reply);
         } catch (Throwable e) {
-            LOGGER.w("dispatchRequestPermissionResult via moe descriptor failed");
+            LOGGER.w(e, "dispatchRequestPermissionResult via moe descriptor failed");
         }
     }
 }
