@@ -130,7 +130,12 @@ public class Logger {
         
         Log.println(priority, tag, fullMsg);
 
-        if (sEventDispatcher != null && priority >= Log.WARN) {
+        // WARN is used throughout the server for routine/expected fallback paths (legacy
+        // binder descriptor compat, blocked-but-handled calls, etc.), not just real problems.
+        // Forwarding all of those to Sentry as full events - across every client on every
+        // device - was a major driver of quota exhaustion. Only genuine errors are worth the
+        // event budget; logcat still gets everything via Log.println above regardless.
+        if (sEventDispatcher != null && priority >= Log.ERROR) {
             sEventDispatcher.dispatch(priority, tag, msg, tr);
         }
     }
