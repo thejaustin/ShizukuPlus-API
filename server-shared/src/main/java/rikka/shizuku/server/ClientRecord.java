@@ -30,10 +30,7 @@ public class ClientRecord {
     public void dispatchRequestPermissionResult(int requestCode, boolean allowed) {
         Bundle reply = new Bundle();
         reply.putBoolean(REQUEST_PERMISSION_REPLY_ALLOWED, allowed);
-        try {
-            client.dispatchRequestPermissionResult(requestCode, reply);
-        } catch (Throwable e) {
-            LOGGER.w(e, "dispatchRequestPermissionResult failed for client (uid=%d, pid=%d, package=%s)", uid, pid, packageName);
-        }
+        // Dispatch via both af and moe descriptors so stock clients (e.g. Obtainium) receive it.
+        AppBinderCompat.dispatchRequestPermissionResult(client, requestCode, reply);
     }
 }

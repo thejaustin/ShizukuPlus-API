@@ -447,6 +447,18 @@ public abstract class Service<
                         attachApplication(IShizukuApplication.Stub.asInterface(binder), args);
                         reply.writeNoException();
                         return true;
+                    case 17: { // attachApplication v13+
+                        // Must be handled here like the other legacy-token methods: the interface
+                        // token was already consumed above, so letting this fall through to
+                        // super.onTransact re-reads from the wrong parcel position and the attach
+                        // fails ("not an attached client"), breaking getUid/getVersion/bindApplication
+                        // for every v13 client (including the manager itself).
+                        IBinder appBinder = data.readStrongBinder();
+                        Bundle attachArgs = data.readInt() != 0 ? Bundle.CREATOR.createFromParcel(data) : null;
+                        attachApplication(IShizukuApplication.Stub.asInterface(appBinder), attachArgs);
+                        reply.writeNoException();
+                        return true;
+                    }
                 }
             } else {
                 // Shizuku+ specific handling for code 14 and 17
