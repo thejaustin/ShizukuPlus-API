@@ -1,7 +1,7 @@
 package moe.shizuku.server;
 
 import moe.shizuku.server.IRemoteProcess;
-import af.shizuku.server.IShizukuApplication;
+import moe.shizuku.server.IShizukuApplication;
 import moe.shizuku.server.IShizukuServiceConnection;
 import af.shizuku.server.IVirtualMachineManager;
 import af.shizuku.server.IStorageProxy;

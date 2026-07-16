@@ -19,7 +19,7 @@ import java.lang.reflect.Method;
 import java.util.Arrays;
 
 import moe.shizuku.server.IRemoteProcess;
-import af.shizuku.server.IShizukuApplication;
+import moe.shizuku.server.IShizukuApplication;
 import moe.shizuku.server.IShizukuService;
 import moe.shizuku.server.IShizukuServiceConnection;
 import rikka.hidden.compat.PermissionManagerApis;

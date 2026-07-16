@@ -30,7 +30,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
-import af.shizuku.server.IShizukuApplication;
+import moe.shizuku.server.IShizukuApplication;
 import moe.shizuku.server.IShizukuService;
 
 public class Shizuku {
