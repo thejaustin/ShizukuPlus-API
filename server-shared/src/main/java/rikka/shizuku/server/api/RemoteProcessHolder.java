@@ -7,7 +7,7 @@ import android.os.RemoteException;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 
-import af.shizuku.server.IRemoteProcess;
+import moe.shizuku.server.IRemoteProcess;
 import rikka.shizuku.server.util.Logger;
 import rikka.shizuku.server.util.ParcelFileDescriptorUtil;
 

@@ -14,7 +14,7 @@ import java.util.Collections;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
-import af.shizuku.server.IRemoteProcess;
+import moe.shizuku.server.IRemoteProcess;
 
 public class ShizukuRemoteProcess extends Process implements Parcelable {
 
