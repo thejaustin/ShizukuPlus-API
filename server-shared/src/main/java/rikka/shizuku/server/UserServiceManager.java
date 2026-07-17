@@ -29,7 +29,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 
 import moe.shizuku.server.IShizukuServiceConnection;
-import rikka.hidden.compat.PackageManagerApis;
+import af.shizuku.common.compat.Android17Compat;
 import rikka.shizuku.ShizukuApiConstants;
 import rikka.shizuku.server.util.AbiUtil;
 import rikka.shizuku.server.util.Logger;
@@ -48,7 +48,7 @@ public abstract class UserServiceManager {
 
     public PackageInfo ensureCallingPackageForUserService(String packageName, int appId, int userId) {
         @SuppressLint("UnsafeOptInUsageError")
-        PackageInfo packageInfo = PackageManagerApis.getPackageInfoNoThrow(packageName, 0x00002000 /*PackageManager.MATCH_UNINSTALLED_PACKAGES*/, userId);
+        PackageInfo packageInfo = Android17Compat.getPackageInfo(packageName, 0x00002000 /*PackageManager.MATCH_UNINSTALLED_PACKAGES*/, userId);
         if (packageInfo == null || packageInfo.applicationInfo == null) {
             throw new SecurityException("unable to find package " + packageName);
         }
