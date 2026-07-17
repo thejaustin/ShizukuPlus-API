@@ -249,7 +249,14 @@ public abstract class UserServiceManager {
         }
 
         if (entry == null) {
-            throw new IllegalArgumentException("unable to find token " + token);
+            // A user-service process can attach with a token we no longer track: the record was
+            // already removed (app unbound / process killed), or the server restarted and lost its
+            // in-memory records while a previously-started process kept running and re-attached.
+            // This is an expected condition, not a caller error — throwing here only marshals the
+            // exception back across the binder and surfaces as a client crash (SHIZUKUPLUS-79).
+            // Log and drop the orphaned attach instead.
+            LOGGER.w("attachUserService: unable to find token %s (stale or duplicate attach; ignoring)", token);
+            return;
         }
 
         LOGGER.v("Received binder for service record %s", token);
