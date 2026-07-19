@@ -27,6 +27,13 @@ public class ShizukuRemoteProcess extends Process implements Parcelable {
     private InputStream is;
 
     ShizukuRemoteProcess(IRemoteProcess remote) {
+        // The service returns null when the privileged process could not be started (e.g. the
+        // command failed to spawn, or a stale server rejected the call). Fail with a clear,
+        // catchable exception instead of an NPE on remote.asBinder() (SHIZUKUPLUS-85).
+        if (remote == null) {
+            throw new IllegalStateException(
+                    "Shizuku returned a null remote process for newProcess() — the privileged service could not start the command");
+        }
         this.remote = remote;
         try {
             this.remote.asBinder().linkToDeath((IBinder.DeathRecipient) () -> {
