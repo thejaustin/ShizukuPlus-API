@@ -30,6 +30,7 @@ import java.util.concurrent.Executors;
 
 import moe.shizuku.server.IShizukuServiceConnection;
 import af.shizuku.common.compat.Android17Compat;
+import rikka.hidden.compat.DeviceIdleControllerApis;
 import rikka.shizuku.ShizukuApiConstants;
 import rikka.shizuku.server.util.AbiUtil;
 import rikka.shizuku.server.util.Logger;
@@ -91,6 +92,21 @@ public abstract class UserServiceManager {
         return 0;
     }
 
+    // Guards against Android's Cached Apps Freezer (12+): broadcastBinderReceived() delivers a
+    // oneway callback into packageName's own process, which may have backgrounded and been frozen
+    // between requesting the UserService and it becoming ready - silently dropping the callback
+    // ("sent binder code ... to frozen apps and got error -74", see #371). The temp allowlist
+    // clears OomAdjuster's freeze state for the UID (SHOULD_NOT_FREEZE_REASON_UID_ALLOWLISTED),
+    // not just Doze/App-Standby.
+    private void whitelistBeforeCallback(String packageName, int userId) {
+        try {
+            DeviceIdleControllerApis.addPowerSaveTempWhitelistApp(packageName, 30 * 1000, userId,
+                    316/* PowerExemptionManager#REASON_SHELL */, "shell");
+        } catch (Throwable e) {
+            LOGGER.w(e, "Failed to add %s to power save temp whitelist before broadcastBinderReceived", packageName);
+        }
+    }
+
     private void removeUserServiceLocked(UserServiceRecord record) {
         if (userServiceRecords.values().remove(record)) {
             record.destroy();
@@ -129,6 +145,7 @@ public abstract class UserServiceManager {
                     record.callbacks.register(conn);
 
                     if (record.service != null && record.service.pingBinder()) {
+                        whitelistBeforeCallback(packageName, userId);
                         record.broadcastBinderReceived();
 
                         if (callingApiVersion >= 13) {
@@ -149,6 +166,7 @@ public abstract class UserServiceManager {
                 newRecord.callbacks.register(conn);
 
                 if (newRecord.service != null && newRecord.service.pingBinder()) {
+                    whitelistBeforeCallback(packageName, userId);
                     newRecord.broadcastBinderReceived();
                 } else if (!newRecord.starting) {
                     newRecord.setStartingTimeout(DateUtils.SECOND_IN_MILLIS * 30);

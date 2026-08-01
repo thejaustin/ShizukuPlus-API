@@ -4,7 +4,9 @@ import static rikka.shizuku.ShizukuApiConstants.REQUEST_PERMISSION_REPLY_ALLOWED
 
 import android.os.Bundle;
 
+import af.shizuku.common.util.UserHandleCompat;
 import moe.shizuku.server.IShizukuApplication;
+import rikka.hidden.compat.DeviceIdleControllerApis;
 import rikka.shizuku.server.util.Logger;
 
 public class ClientRecord {
@@ -30,6 +32,18 @@ public class ClientRecord {
     public void dispatchRequestPermissionResult(int requestCode, boolean allowed) {
         Bundle reply = new Bundle();
         reply.putBoolean(REQUEST_PERMISSION_REPLY_ALLOWED, allowed);
+        try {
+            // This fires right after the user taps Allow/Deny in the manager's permission dialog -
+            // exactly when the requesting app is most likely to have been backgrounded long enough
+            // for Android's Cached Apps Freezer (12+) to have frozen it, silently dropping this
+            // oneway callback ("sent binder code ... to frozen apps and got error -74", see #371).
+            // The temp allowlist clears OomAdjuster's freeze state for the UID
+            // (SHOULD_NOT_FREEZE_REASON_UID_ALLOWLISTED), not just Doze.
+            DeviceIdleControllerApis.addPowerSaveTempWhitelistApp(packageName, 30 * 1000,
+                    UserHandleCompat.getUserId(uid), 316/* PowerExemptionManager#REASON_SHELL */, "shell");
+        } catch (Throwable e) {
+            LOGGER.w(e, "Failed to add %s to power save temp whitelist before dispatchRequestPermissionResult", packageName);
+        }
         try {
             client.dispatchRequestPermissionResult(requestCode, reply);
         } catch (Throwable e) {
