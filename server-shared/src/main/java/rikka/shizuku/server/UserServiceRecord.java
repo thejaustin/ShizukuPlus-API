@@ -11,6 +11,7 @@ import android.os.RemoteException;
 import java.util.UUID;
 
 import moe.shizuku.server.IShizukuServiceConnection;
+import rikka.hidden.compat.DeviceIdleControllerApis;
 import rikka.shizuku.server.util.HandlerUtil;
 import rikka.shizuku.server.util.Logger;
 
@@ -35,14 +36,18 @@ public abstract class UserServiceRecord {
 
     private final IBinder.DeathRecipient deathRecipient;
     public final int versionCode;
+    public final String packageName;
+    public final int userId;
     public String token;
     public IBinder service;
     public final RemoteCallbackList<IShizukuServiceConnection> callbacks = new ConnectionList();
     public boolean daemon;
     public boolean starting;
 
-    public UserServiceRecord(int versionCode, boolean daemon) {
+    public UserServiceRecord(int versionCode, boolean daemon, String packageName, int userId) {
         this.versionCode = versionCode;
+        this.packageName = packageName;
+        this.userId = userId;
         this.token = UUID.randomUUID().toString() + "-" + System.currentTimeMillis();
         this.deathRecipient = () -> {
             LOGGER.v("Binder for service record %s is dead", token);
@@ -84,6 +89,18 @@ public abstract class UserServiceRecord {
             binder.linkToDeath(deathRecipient, 0);
         } catch (Throwable tr) {
             LOGGER.w("linkToDeath %s", token);
+        }
+
+        // Guards against Android's Cached Apps Freezer (12+): broadcastBinderReceived() below
+        // delivers a oneway callback into packageName's own process, which may have backgrounded
+        // and been frozen while the UserService process was starting - silently dropping the
+        // callback ("sent binder code ... to frozen apps and got error -74", see #371). Mirrors
+        // UserServiceManager#whitelistBeforeCallback for this, the first-connect call site.
+        try {
+            DeviceIdleControllerApis.addPowerSaveTempWhitelistApp(packageName, 30 * 1000, userId,
+                    316/* PowerExemptionManager#REASON_SHELL */, "shell");
+        } catch (Throwable e) {
+            LOGGER.w(e, "Failed to add %s to power save temp whitelist before broadcastBinderReceived", packageName);
         }
 
         broadcastBinderReceived();

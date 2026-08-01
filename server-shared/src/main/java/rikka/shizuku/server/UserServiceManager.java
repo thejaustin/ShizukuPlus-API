@@ -162,7 +162,7 @@ public abstract class UserServiceManager {
                     return 1;
                 }
             } else {
-                UserServiceRecord newRecord = createUserServiceRecordIfNeededLocked(record, key, versionCode, daemon, packageInfo);
+                UserServiceRecord newRecord = createUserServiceRecordIfNeededLocked(record, key, versionCode, daemon, packageInfo, userId);
                 newRecord.callbacks.register(conn);
 
                 if (newRecord.service != null && newRecord.service.pingBinder()) {
@@ -185,7 +185,7 @@ public abstract class UserServiceManager {
     }
 
     private UserServiceRecord createUserServiceRecordIfNeededLocked(
-            UserServiceRecord record, String key, int versionCode, boolean daemon, PackageInfo packageInfo) {
+            UserServiceRecord record, String key, int versionCode, boolean daemon, PackageInfo packageInfo, int userId) {
 
         if (record != null) {
             if (record.versionCode != versionCode) {
@@ -204,7 +204,9 @@ public abstract class UserServiceManager {
             removeUserServiceLocked(record);
         }
 
-        record = new UserServiceRecord(versionCode, daemon) {
+        String packageName = packageInfo.packageName;
+
+        record = new UserServiceRecord(versionCode, daemon, packageName, userId) {
 
             @Override
             public void removeSelf() {
@@ -214,7 +216,6 @@ public abstract class UserServiceManager {
             }
         };
 
-        String packageName = packageInfo.packageName;
         List<UserServiceRecord> list = packageUserServiceRecords.get(packageName);
         if (list == null) {
             list = Collections.synchronizedList(new ArrayList<>());
