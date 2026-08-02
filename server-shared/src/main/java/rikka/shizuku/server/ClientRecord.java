@@ -7,6 +7,7 @@ import android.os.Bundle;
 import af.shizuku.common.util.UserHandleCompat;
 import moe.shizuku.server.IShizukuApplication;
 import rikka.hidden.compat.DeviceIdleControllerApis;
+import rikka.shizuku.server.util.HandlerUtil;
 import rikka.shizuku.server.util.Logger;
 
 public class ClientRecord {
@@ -47,7 +48,18 @@ public class ClientRecord {
         try {
             client.dispatchRequestPermissionResult(requestCode, reply);
         } catch (Throwable e) {
-            LOGGER.w(e, "dispatchRequestPermissionResult failed for client (uid=%d, pid=%d, package=%s)", uid, pid, packageName);
+            // The whitelist call above only requests an unfreeze; it doesn't guarantee AMS has
+            // actually cleared the freeze state before this transact runs in the same call stack.
+            // A user who just tapped Allow on a rish/plus consent notification (#377) can still
+            // lose this race - retry once after a short delay instead of dropping the grant.
+            LOGGER.w(e, "dispatchRequestPermissionResult failed for client (uid=%d, pid=%d, package=%s), scheduling one retry", uid, pid, packageName);
+            HandlerUtil.getMainHandler().postDelayed(() -> {
+                try {
+                    client.dispatchRequestPermissionResult(requestCode, reply);
+                } catch (Throwable retryError) {
+                    LOGGER.w(retryError, "Retry dispatchRequestPermissionResult failed for client (uid=%d, pid=%d, package=%s)", uid, pid, packageName);
+                }
+            }, 300);
         }
     }
 }

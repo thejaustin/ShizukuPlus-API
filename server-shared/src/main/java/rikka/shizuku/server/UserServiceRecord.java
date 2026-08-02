@@ -142,12 +142,28 @@ public abstract class UserServiceRecord {
     public void broadcastBinderReceived() {
         LOGGER.v("Broadcast binder received for service record %s", token);
 
+        IBinder deliveredService = service;
         int count = callbacks.beginBroadcast();
         for (int i = 0; i < count; i++) {
+            IShizukuServiceConnection conn = callbacks.getBroadcastItem(i);
             try {
-                callConnected(callbacks.getBroadcastItem(i), service);
+                callConnected(conn, deliveredService);
             } catch (Throwable e) {
-                LOGGER.w("Failed to call connected %s", token);
+                // addPowerSaveTempWhitelistApp() in setBinder()/whitelistBeforeCallback() only
+                // *requests* an unfreeze from AMS's own handler - it doesn't guarantee the freeze
+                // state has actually cleared before this oneway transact runs in the same call
+                // stack, so the very first attempt can still lose the race and hit the same "sent
+                // binder code ... to frozen apps" drop it was meant to guard against (#371, still
+                // reported failing on r2202/r2204). One delayed retry gives the exemption a real
+                // chance to take effect instead of silently giving up on the first loss.
+                LOGGER.w(e, "Failed to call connected %s, scheduling one retry", token);
+                HandlerUtil.getMainHandler().postDelayed(() -> {
+                    try {
+                        callConnected(conn, deliveredService);
+                    } catch (Throwable retryError) {
+                        LOGGER.w(retryError, "Retry failed to call connected %s", token);
+                    }
+                }, 300);
             }
         }
         callbacks.finishBroadcast();
