@@ -3,7 +3,6 @@ package rikka.shizuku.server;
 import static rikka.shizuku.ShizukuApiConstants.USER_SERVICE_TRANSACTION_destroy;
 
 import android.os.Binder;
-import android.os.Build;
 import android.os.IBinder;
 import android.os.Parcel;
 import android.os.RemoteCallbackList;
@@ -12,7 +11,6 @@ import android.os.RemoteException;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import moe.shizuku.server.IShizukuServiceConnection;
 import rikka.hidden.compat.DeviceIdleControllerApis;
@@ -167,10 +165,13 @@ public abstract class UserServiceRecord {
                 // stack, so the very first attempt can still lose the race and hit the same "sent
                 // binder code ... to frozen apps" drop it was meant to guard against. Reported
                 // still failing through r2206 on aggressive OEM freezers (ColorOS) with a fixed
-                // 300ms single retry (#371) - a short backoff retry gives the exemption more real
-                // chances to take effect; on devices that support it (API 36+), a frozen-state
-                // callback supplements this by reacting to the actual unfreeze event instead of
-                // guessing at a delay at all.
+                // 300ms single retry (#371) - a backoff retry gives the exemption more real
+                // chances to take effect. gmm96's #371 writeup suggested IBinder.
+                // addFrozenStateChangeCallback (AOSP, Android 16/API 36) to react to the actual
+                // unfreeze event instead of guessing at a delay - investigated, but that symbol
+                // isn't present in this project's actual compileSdk 36 android.jar despite AOSP
+                // platform source having it (a CI-verified compile failure, not a guess), so it's
+                // deferred until it's actually available in a shipped SDK.
                 //
                 // broadcastBinderReceived() can be called again (e.g. UserServiceManager rebinding
                 // an already-connected daemon) while a retry from an earlier failed attempt is
@@ -183,9 +184,7 @@ public abstract class UserServiceRecord {
                     LOGGER.w(e, "Failed to call connected %s, retry already pending for this connection", token);
                 } else {
                     LOGGER.w(e, "Failed to call connected %s, scheduling retry", token);
-                    AtomicBoolean delivered = new AtomicBoolean(false);
-                    scheduleBackoffRetry(conn, connBinder, deliveredService, broadcastGeneration, 0, delivered);
-                    tryRegisterFrozenStateRetry(conn, connBinder, deliveredService, broadcastGeneration, delivered);
+                    scheduleBackoffRetry(conn, connBinder, deliveredService, broadcastGeneration, 0);
                 }
             }
         }
@@ -195,11 +194,8 @@ public abstract class UserServiceRecord {
     private static final long[] RETRY_DELAYS_MS = {300, 1000, 3000};
 
     private void scheduleBackoffRetry(IShizukuServiceConnection conn, IBinder connBinder, IBinder deliveredService,
-                                       int broadcastGeneration, int attempt, AtomicBoolean delivered) {
+                                       int broadcastGeneration, int attempt) {
         HandlerUtil.getMainHandler().postDelayed(() -> {
-            if (delivered.get()) {
-                return;
-            }
             if (bindGeneration != broadcastGeneration) {
                 pendingRetryBinders.remove(connBinder);
                 LOGGER.w("Skipping stale retry for %s (service superseded or destroyed)", token);
@@ -207,60 +203,17 @@ public abstract class UserServiceRecord {
             }
             try {
                 callConnected(conn, deliveredService);
-                delivered.set(true);
                 pendingRetryBinders.remove(connBinder);
             } catch (Throwable retryError) {
                 if (attempt + 1 < RETRY_DELAYS_MS.length) {
                     LOGGER.w(retryError, "Retry %d failed to call connected %s, scheduling next retry", attempt + 1, token);
-                    scheduleBackoffRetry(conn, connBinder, deliveredService, broadcastGeneration, attempt + 1, delivered);
+                    scheduleBackoffRetry(conn, connBinder, deliveredService, broadcastGeneration, attempt + 1);
                 } else {
                     pendingRetryBinders.remove(connBinder);
                     LOGGER.w(retryError, "All backoff retries failed to call connected %s", token);
                 }
             }
         }, RETRY_DELAYS_MS[attempt]);
-    }
-
-    // AOSP added IBinder.addFrozenStateChangeCallback in Android 16 (API 36) as a plain public
-    // IBinder method (no hidden-API access needed) so a listener can react to the actual unfreeze
-    // event instead of guessing at a fixed delay - see #371, gmm96's logcat-confirmed writeup.
-    // Guarded behind SDK_INT since this module's minSdk is 24 and calling the method
-    // unconditionally would throw NoSuchMethodError on every older device this runs on right now
-    // (API 36 adoption is effectively nil at time of writing). Purely supplemental to the backoff
-    // retry above - `delivered` ensures only one path actually redelivers.
-    private void tryRegisterFrozenStateRetry(IShizukuServiceConnection conn, IBinder connBinder, IBinder deliveredService,
-                                              int broadcastGeneration, AtomicBoolean delivered) {
-        if (Build.VERSION.SDK_INT < 36) {
-            return;
-        }
-        try {
-            IBinder.FrozenStateChangeCallback callback = new IBinder.FrozenStateChangeCallback() {
-                @Override
-                public void onFrozenStateChanged(IBinder who, int state) {
-                    if (state != IBinder.FrozenStateChangeCallback.STATE_UNFROZEN) {
-                        return;
-                    }
-                    who.removeFrozenStateChangeCallback(this);
-                    if (delivered.get() || bindGeneration != broadcastGeneration) {
-                        pendingRetryBinders.remove(connBinder);
-                        return;
-                    }
-                    try {
-                        callConnected(conn, deliveredService);
-                        delivered.set(true);
-                    } catch (Throwable retryError) {
-                        LOGGER.w(retryError, "Frozen-state-triggered retry failed to call connected %s", token);
-                    } finally {
-                        pendingRetryBinders.remove(connBinder);
-                    }
-                }
-            };
-            connBinder.addFrozenStateChangeCallback(HandlerUtil.getMainHandler()::post, callback);
-        } catch (Throwable t) {
-            // Not supported on this device/binder driver - the backoff retry already scheduled
-            // above is the fallback.
-            LOGGER.v("addFrozenStateChangeCallback unavailable for " + token + ", relying on backoff retry", t);
-        }
     }
 
     public void broadcastBinderDied() {
