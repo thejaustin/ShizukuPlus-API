@@ -8,7 +8,9 @@ import android.os.Parcel;
 import android.os.RemoteCallbackList;
 import android.os.RemoteException;
 
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 import moe.shizuku.server.IShizukuServiceConnection;
 import rikka.hidden.compat.DeviceIdleControllerApis;
@@ -43,6 +45,12 @@ public abstract class UserServiceRecord {
     public final RemoteCallbackList<IShizukuServiceConnection> callbacks = new ConnectionList();
     public boolean daemon;
     public boolean starting;
+
+    // Bumped on every setBinder()/destroy() so a delayed retry in broadcastBinderReceived() can
+    // detect the record has moved on (rebound to a new service, or torn down) since it was
+    // scheduled, instead of blindly delivering a stale/superseded binder.
+    private volatile int bindGeneration = 0;
+    private final Set<IBinder> pendingRetryBinders = ConcurrentHashMap.newKeySet();
 
     public UserServiceRecord(int versionCode, boolean daemon, String packageName, int userId) {
         this.versionCode = versionCode;
@@ -84,6 +92,7 @@ public abstract class UserServiceRecord {
         HandlerUtil.getMainHandler().removeCallbacks(startTimeoutCallback);
 
         service = binder;
+        bindGeneration++;
 
         try {
             binder.linkToDeath(deathRecipient, 0);
@@ -143,6 +152,7 @@ public abstract class UserServiceRecord {
         LOGGER.v("Broadcast binder received for service record %s", token);
 
         IBinder deliveredService = service;
+        int broadcastGeneration = bindGeneration;
         int count = callbacks.beginBroadcast();
         for (int i = 0; i < count; i++) {
             IShizukuServiceConnection conn = callbacks.getBroadcastItem(i);
@@ -156,14 +166,31 @@ public abstract class UserServiceRecord {
                 // binder code ... to frozen apps" drop it was meant to guard against (#371, still
                 // reported failing on r2202/r2204). One delayed retry gives the exemption a real
                 // chance to take effect instead of silently giving up on the first loss.
-                LOGGER.w(e, "Failed to call connected %s, scheduling one retry", token);
-                HandlerUtil.getMainHandler().postDelayed(() -> {
-                    try {
-                        callConnected(conn, deliveredService);
-                    } catch (Throwable retryError) {
-                        LOGGER.w(retryError, "Retry failed to call connected %s", token);
-                    }
-                }, 300);
+                //
+                // broadcastBinderReceived() can be called again (e.g. UserServiceManager rebinding
+                // an already-connected daemon) while a retry from an earlier failed attempt is
+                // still pending, and setBinder()/destroy() can supersede or tear down `service` in
+                // the meantime - pendingRetryBinders dedupes so this callback doesn't end up with
+                // two in-flight retries, and the generation check makes a retry a no-op once the
+                // record has moved on, instead of delivering a stale or post-destroy binder.
+                IBinder connBinder = conn.asBinder();
+                if (!pendingRetryBinders.add(connBinder)) {
+                    LOGGER.w(e, "Failed to call connected %s, retry already pending for this connection", token);
+                } else {
+                    LOGGER.w(e, "Failed to call connected %s, scheduling one retry", token);
+                    HandlerUtil.getMainHandler().postDelayed(() -> {
+                        pendingRetryBinders.remove(connBinder);
+                        if (bindGeneration != broadcastGeneration) {
+                            LOGGER.w("Skipping stale retry for %s (service superseded or destroyed)", token);
+                            return;
+                        }
+                        try {
+                            callConnected(conn, deliveredService);
+                        } catch (Throwable retryError) {
+                            LOGGER.w(retryError, "Retry failed to call connected %s", token);
+                        }
+                    }, 300);
+                }
             }
         }
         callbacks.finishBroadcast();
@@ -186,6 +213,10 @@ public abstract class UserServiceRecord {
     public abstract void removeSelf();
 
     public void destroy() {
+        // Invalidate any retry scheduled by broadcastBinderReceived() before this call - it must
+        // not deliver `connected()` for a service that's about to be torn down.
+        bindGeneration++;
+
         if (service != null) {
             service.unlinkToDeath(deathRecipient, 0);
         }
