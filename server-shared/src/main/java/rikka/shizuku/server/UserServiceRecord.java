@@ -191,7 +191,12 @@ public abstract class UserServiceRecord {
         callbacks.finishBroadcast();
     }
 
-    private static final long[] RETRY_DELAYS_MS = {300, 1000, 3000};
+    // {300, 1000, 3000} covered most AOSP and lightly-customised devices but was consistently
+    // defeated on aggressive OEM builds (Samsung One UI, ColorOS) whose background-process managers
+    // re-freeze the target in under 300ms - the first retry still hits a frozen process. The 9s
+    // fourth slot gives those OEMs' exemption-propagation pipelines significantly more headroom
+    // without meaningfully delaying success on devices where the 300ms slot already works.
+    private static final long[] RETRY_DELAYS_MS = {300, 1000, 3000, 9000};
 
     private void scheduleBackoffRetry(IShizukuServiceConnection conn, IBinder connBinder, IBinder deliveredService,
                                        int broadcastGeneration, int attempt) {

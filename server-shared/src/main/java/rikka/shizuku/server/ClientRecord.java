@@ -63,7 +63,8 @@ public class ClientRecord {
         }
     }
 
-    private static final long[] RETRY_DELAYS_MS = {300, 1000, 3000};
+    // Mirrors UserServiceRecord.RETRY_DELAYS_MS — see that declaration for the rationale.
+    private static final long[] RETRY_DELAYS_MS = {300, 1000, 3000, 9000};
 
     private void scheduleBackoffRetry(int requestCode, Bundle reply, int attempt) {
         HandlerUtil.getMainHandler().postDelayed(() -> {
