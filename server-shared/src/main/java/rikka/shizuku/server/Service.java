@@ -439,15 +439,11 @@ public abstract class Service<
                         reply.writeNoException();
                         reply.writeString(getSELinuxContext());
                         return true;
-                    case 14: // legacy attachApplication (v12 style: IBinder + String)
-                        IBinder legacyBinder = data.readStrongBinder();
-                        String packageName = data.readString();
-                        Bundle legacyArgs = new Bundle();
-                        legacyArgs.putString(ShizukuApiConstants.ATTACH_APPLICATION_PACKAGE_NAME, packageName);
-                        legacyArgs.putInt(ShizukuApiConstants.ATTACH_APPLICATION_API_VERSION, -1);
-                        attachApplication(IShizukuApplication.Stub.asInterface(legacyBinder), legacyArgs);
-                        reply.writeNoException();
-                        return true;
+                    // case 14 (attachApplication v12 style: IBinder + String) intentionally
+                    // omitted — code 14 is now requestPermission(int) per the current AIDL,
+                    // and all v12 clients are pre-2020 / no longer in use. Handling code 14
+                    // as legacy attachApplication here would permanently shadow requestPermission
+                    // for all v13+ callers (isLegacy == isNew always, so this switch always runs).
                 }
             }
             // v13+ codes: requestPermission (14) and attachApplication (17).
