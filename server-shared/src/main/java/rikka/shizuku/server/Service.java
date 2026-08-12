@@ -402,60 +402,55 @@ public abstract class Service<
         // Support legacy interface tokens from existing Shizuku apps
         data.setDataPosition(0);
         String descriptor = readInterfaceTokenCompat(data);
-        boolean isLegacy = "moe.shizuku.server.IShizukuService".equals(descriptor);
-        boolean isNew = ShizukuApiConstants.BINDER_DESCRIPTOR.equals(descriptor);
+        // BINDER_DESCRIPTOR == "moe.shizuku.server.IShizukuService" — same as the legacy string,
+        // so this is always true for all Shizuku transactions. The variable name reflects intent
+        // rather than a runtime distinction between two different descriptor strings.
+        boolean isKnownDescriptor = "moe.shizuku.server.IShizukuService".equals(descriptor);
 
-        if (isLegacy || isNew) {
+        if (isKnownDescriptor) {
             if (code == ShizukuApiConstants.BINDER_TRANSACTION_transact) {
                 transactRemote(data, reply, flags);
                 return true;
             }
 
-            if (isLegacy) {
-                // Manually handle legacy callers (v12 and below) to avoid descriptor mismatch
-                // in super.onTransact. Codes not in this switch fall through to the v13+ block.
-                switch (code) {
-                    case 2: // getVersion
-                        reply.writeNoException();
-                        reply.writeInt(getVersion());
-                        return true;
-                    case 3: // getUid
-                        reply.writeNoException();
-                        reply.writeInt(getUid());
-                        return true;
-                    case 4: // checkPermission
-                        reply.writeNoException();
-                        reply.writeInt(checkPermission(data.readString()));
-                        return true;
-                    case 7: // newProcess
-                        String[] cmd = data.createStringArray();
-                        String[] env = data.createStringArray();
-                        String dir = data.readString();
-                        IRemoteProcess process = newProcess(cmd, env, dir);
-                        reply.writeNoException();
-                        reply.writeStrongBinder(process != null ? process.asBinder() : null);
-                        return true;
-                    case 8: // getSELinuxContext
-                        reply.writeNoException();
-                        reply.writeString(getSELinuxContext());
-                        return true;
-                    // case 14 (attachApplication v12 style: IBinder + String) intentionally
-                    // omitted — code 14 is now requestPermission(int) per the current AIDL,
-                    // and all v12 clients are pre-2020 / no longer in use. Handling code 14
-                    // as legacy attachApplication here would permanently shadow requestPermission
-                    // for all v13+ callers (isLegacy == isNew always, so this switch always runs).
-                }
+            // v12 and below callers: handle manually to avoid descriptor mismatch in super.onTransact.
+            // Codes not in this switch fall through to the v13+ block below.
+            // Note: case 14 (v12-era attachApplication: IBinder + String) is intentionally absent —
+            // code 14 is now requestPermission(int) per current AIDL, and all pre-2020 v12 clients
+            // are no longer in circulation.
+            switch (code) {
+                case 2: // getVersion
+                    reply.writeNoException();
+                    reply.writeInt(getVersion());
+                    return true;
+                case 3: // getUid
+                    reply.writeNoException();
+                    reply.writeInt(getUid());
+                    return true;
+                case 4: // checkPermission
+                    reply.writeNoException();
+                    reply.writeInt(checkPermission(data.readString()));
+                    return true;
+                case 7: // newProcess
+                    String[] cmd = data.createStringArray();
+                    String[] env = data.createStringArray();
+                    String dir = data.readString();
+                    IRemoteProcess process = newProcess(cmd, env, dir);
+                    reply.writeNoException();
+                    reply.writeStrongBinder(process != null ? process.asBinder() : null);
+                    return true;
+                case 8: // getSELinuxContext
+                    reply.writeNoException();
+                    reply.writeString(getSELinuxContext());
+                    return true;
             }
             // v13+ codes: requestPermission (14) and attachApplication (17).
-            // Previously these were in a dead 'else' branch because isLegacy and isNew
-            // both check the same descriptor constant ("moe.shizuku.server.IShizukuService"),
-            // making isLegacy == isNew always true and the else unreachable. Without this fix
-            // code 17 fell through to super.onTransact() with data already past the interface
-            // token, causing enforceInterface() to read the binder argument as a descriptor
-            // string and throw — leaving clientRecord null for all API v13+ callers. That null
-            // record caused a 4-byte data misalignment in transactRemote (flags field skipped),
-            // so every ShizukuBinderWrapper call to PM services received malformed data and
-            // IPackageManager.packageInstaller returned null → NPE in installer apps (#406).
+            // Previously in a dead else-branch: code 17 fell through to super.onTransact() with
+            // data already past the interface token, causing enforceInterface() to read the binder
+            // argument as a descriptor string and throw — leaving clientRecord null for all API
+            // v13+ callers. That null record caused a 4-byte misalignment in transactRemote (flags
+            // field skipped), forwarding malformed data to PM; IPackageManager.packageInstaller
+            // returned null → NPE in installer apps (#406).
             if (code == 14 /* requestPermission */) {
                 requestPermission(data.readInt());
                 reply.writeNoException();
