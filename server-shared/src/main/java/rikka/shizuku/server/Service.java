@@ -412,7 +412,8 @@ public abstract class Service<
             }
 
             if (isLegacy) {
-                // Manually handle all methods for legacy callers to avoid descriptor mismatch in super.onTransact
+                // Manually handle legacy callers (v12 and below) to avoid descriptor mismatch
+                // in super.onTransact. Codes not in this switch fall through to the v13+ block.
                 switch (code) {
                     case 2: // getVersion
                         reply.writeNoException();
@@ -438,35 +439,48 @@ public abstract class Service<
                         reply.writeNoException();
                         reply.writeString(getSELinuxContext());
                         return true;
-                    case 14: // legacy attachApplication
-                        IBinder binder = data.readStrongBinder();
+                    case 14: // legacy attachApplication (v12 style: IBinder + String)
+                        IBinder legacyBinder = data.readStrongBinder();
                         String packageName = data.readString();
-                        Bundle args = new Bundle();
-                        args.putString(ShizukuApiConstants.ATTACH_APPLICATION_PACKAGE_NAME, packageName);
-                        args.putInt(ShizukuApiConstants.ATTACH_APPLICATION_API_VERSION, -1);
-                        attachApplication(IShizukuApplication.Stub.asInterface(binder), args);
+                        Bundle legacyArgs = new Bundle();
+                        legacyArgs.putString(ShizukuApiConstants.ATTACH_APPLICATION_PACKAGE_NAME, packageName);
+                        legacyArgs.putInt(ShizukuApiConstants.ATTACH_APPLICATION_API_VERSION, -1);
+                        attachApplication(IShizukuApplication.Stub.asInterface(legacyBinder), legacyArgs);
                         reply.writeNoException();
                         return true;
                 }
-            } else {
-                // Shizuku+ specific handling for code 14 and 17
-                if (code == 14 /* requestPermission */) {
-                    requestPermission(data.readInt());
-                    reply.writeNoException();
-                    return true;
-                } else if (code == 17 /* attachApplication v13+ */) {
-                    IBinder binder = data.readStrongBinder();
-                    Bundle args = data.readInt() != 0 ? Bundle.CREATOR.createFromParcel(data) : null;
-                    attachApplication(IShizukuApplication.Stub.asInterface(binder), args);
-                    reply.writeNoException();
-                    return true;
-                }
+            }
+            // v13+ codes: requestPermission (14) and attachApplication (17).
+            // Previously these were in a dead 'else' branch because isLegacy and isNew
+            // both check the same descriptor constant ("moe.shizuku.server.IShizukuService"),
+            // making isLegacy == isNew always true and the else unreachable. Without this fix
+            // code 17 fell through to super.onTransact() with data already past the interface
+            // token, causing enforceInterface() to read the binder argument as a descriptor
+            // string and throw — leaving clientRecord null for all API v13+ callers. That null
+            // record caused a 4-byte data misalignment in transactRemote (flags field skipped),
+            // so every ShizukuBinderWrapper call to PM services received malformed data and
+            // IPackageManager.packageInstaller returned null → NPE in installer apps (#406).
+            if (code == 14 /* requestPermission */) {
+                requestPermission(data.readInt());
+                reply.writeNoException();
+                return true;
+            } else if (code == 17 /* attachApplication v13+ */) {
+                IBinder binder = data.readStrongBinder();
+                Bundle args = data.readInt() != 0 ? Bundle.CREATOR.createFromParcel(data) : null;
+                attachApplication(IShizukuApplication.Stub.asInterface(binder), args);
+                reply.writeNoException();
+                return true;
             }
         }
 
+        // readInterfaceTokenCompat() above advanced data past the interface token.
+        // Reset to position 0 so rishService and super.onTransact() can call their
+        // own enforceInterface() from the correct position.
+        data.setDataPosition(0);
         if (rishService.onTransact(code, data, reply, flags)) {
             return true;
         }
+        data.setDataPosition(0);
         return super.onTransact(code, data, reply, flags);
     }
 }
