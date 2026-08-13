@@ -384,28 +384,17 @@ public abstract class Service<
         return true;
     }
 
-    // readInterfaceToken() is a hidden API not in public SDK stubs — access via reflection.
-    // Safe in the privileged server process where hidden API restrictions are not enforced.
-    private static String readInterfaceTokenCompat(Parcel parcel) {
-        try {
-            Method m = Parcel.class.getDeclaredMethod("readInterfaceToken");
-            m.setAccessible(true);
-            return (String) m.invoke(parcel);
-        } catch (Exception ignored) {
-            return "";
-        }
-    }
-
     @CallSuper
     @Override
     public boolean onTransact(int code, Parcel data, Parcel reply, int flags) throws RemoteException {
-        // Support legacy interface tokens from existing Shizuku apps
         data.setDataPosition(0);
-        String descriptor = readInterfaceTokenCompat(data);
-        // BINDER_DESCRIPTOR == "moe.shizuku.server.IShizukuService" — same as the legacy string,
-        // so this is always true for all Shizuku transactions. The variable name reflects intent
-        // rather than a runtime distinction between two different descriptor strings.
-        boolean isKnownDescriptor = "moe.shizuku.server.IShizukuService".equals(descriptor);
+        boolean isKnownDescriptor = false;
+        try {
+            data.enforceInterface("moe.shizuku.server.IShizukuService");
+            isKnownDescriptor = true;
+        } catch (SecurityException e) {
+            // Not a Shizuku interface transaction (e.g. rish uses rikka.rish.IRishService)
+        }
 
         if (isKnownDescriptor) {
             if (code == ShizukuApiConstants.BINDER_TRANSACTION_transact) {
