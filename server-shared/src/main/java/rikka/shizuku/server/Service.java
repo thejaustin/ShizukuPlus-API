@@ -138,6 +138,11 @@ public abstract class Service<
         enforceCallingPermission("transactRemote");
 
         IBinder targetBinder = data.readStrongBinder();
+        // Caller can write a null strong binder into the transact payload; fail with a
+        // clear error instead of an opaque NPE on getInterfaceDescriptor() below.
+        if (targetBinder == null) {
+            throw new IllegalArgumentException("transactRemote: null target binder");
+        }
         int targetCode = data.readInt();
         int targetFlags;
 
