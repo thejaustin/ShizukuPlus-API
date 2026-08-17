@@ -146,7 +146,15 @@ public class RishTerminal {
         try {
             exitCode = requestExitCode();
         } catch (Throwable e) {
-            Log.w(TAG, Log.getStackTraceString(e));
+            // Previously logged only via Log.w (logcat) - invisible from an interactive rish
+            // session, so a real failure here (e.g. the host process/binder dying mid-command)
+            // looked identical to the command silently succeeding with no output. Surface it on
+            // stderr too so it's visible to whoever is actually running the command.
+            String trace = Log.getStackTraceString(e);
+            Log.w(TAG, trace);
+            System.err.println("rish: failed to read exit code: " + e.getClass().getName() +
+                    (e.getMessage() != null ? ": " + e.getMessage() : ""));
+            System.err.flush();
             exitCode = -1;
         }
         return exitCode;
