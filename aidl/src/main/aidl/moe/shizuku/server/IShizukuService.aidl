@@ -16,6 +16,7 @@ import af.shizuku.server.IStatusBarGovernorPlus;
 import af.shizuku.server.IPackageGovernorPlus;
 import af.shizuku.server.IDisplayTunerPlus;
 import af.shizuku.server.IAppInspector;
+import af.shizuku.server.IPrivilegedDataSource;
 
 interface IShizukuService {
 
@@ -96,4 +97,6 @@ interface IShizukuService {
     IDisplayTunerPlus getDisplayTunerPlus() = 124;
 
     IAppInspector getAppInspector() = 125;
+
+    IPrivilegedDataSource getPrivilegedDataSource() = 126;
  }

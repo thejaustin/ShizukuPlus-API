@@ -25,6 +25,7 @@ import af.shizuku.server.IStatusBarGovernorPlus;
 import af.shizuku.server.IPackageGovernorPlus;
 import af.shizuku.server.IDisplayTunerPlus;
 import af.shizuku.server.IAppInspector;
+import af.shizuku.server.IPrivilegedDataSource;
 import moe.shizuku.server.IShizukuService;
 import af.shizuku.server.IStorageProxy;
 import af.shizuku.server.IVirtualMachineManager;
@@ -1051,6 +1052,258 @@ public class ShizukuPlusAPI {
                 return r != null ? r : Bundle.EMPTY;
             }
             catch (RemoteException e) { Log.w(TAG, "getRunningAppPids", e); return Bundle.EMPTY; }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // PrivilegedDataSource — SYSTEM_FIXED permission surface of uid 2000
+    // -------------------------------------------------------------------------
+
+    public static class PrivilegedDataSource {
+
+        @Nullable
+        private static IPrivilegedDataSource getService() {
+            IShizukuService svc = requirePlusService();
+            if (svc == null) return null;
+            try { return svc.getPrivilegedDataSource(); }
+            catch (RemoteException e) { Log.w(TAG, "getPrivilegedDataSource", e); return null; }
+        }
+
+        /** Capture a screenshot as a PNG byte stream via READ_FRAME_BUFFER. */
+        @Nullable
+        public static ParcelFileDescriptor screenshotAsPfd() {
+            IPrivilegedDataSource s = getService();
+            if (s == null) return null;
+            try { return s.screenshotAsPfd(); }
+            catch (RemoteException e) { Log.w(TAG, "screenshotAsPfd", e); return null; }
+        }
+
+        /** Synthesize a tap at device coordinates via INJECT_EVENTS. */
+        public static boolean injectTap(int x, int y) {
+            IPrivilegedDataSource s = getService();
+            if (s == null) return false;
+            try { return s.injectTap(x, y); }
+            catch (RemoteException e) { Log.w(TAG, "injectTap", e); return false; }
+        }
+
+        /** Type text by injecting key events via INJECT_EVENTS. */
+        public static boolean injectText(@NonNull String text) {
+            IPrivilegedDataSource s = getService();
+            if (s == null) return false;
+            try { return s.injectText(text); }
+            catch (RemoteException e) { Log.w(TAG, "injectText", e); return false; }
+        }
+
+        /** Swipe gesture via INJECT_EVENTS. */
+        public static boolean injectSwipe(int startX, int startY, int endX, int endY, int durationMs) {
+            IPrivilegedDataSource s = getService();
+            if (s == null) return false;
+            try { return s.injectSwipe(startX, startY, endX, endY, durationMs); }
+            catch (RemoteException e) { Log.w(TAG, "injectSwipe", e); return false; }
+        }
+
+        /** Press a key by keycode via INJECT_EVENTS. */
+        public static boolean injectKeyEvent(int keyCode) {
+            IPrivilegedDataSource s = getService();
+            if (s == null) return false;
+            try { return s.injectKeyEvent(keyCode); }
+            catch (RemoteException e) { Log.w(TAG, "injectKeyEvent", e); return false; }
+        }
+
+        /**
+         * Query SMS messages. folder: "inbox", "sent", "draft", "outbox", "all".
+         * Bundle keys: address, body, date, read, type.
+         * Requires READ_SMS (SYSTEM_FIXED on uid 2000).
+         */
+        @NonNull
+        public static List<Bundle> getSmsMessages(@Nullable String folder, int maxCount) {
+            IPrivilegedDataSource s = getService();
+            if (s == null) return Collections.emptyList();
+            try {
+                List<Bundle> r = s.getSmsMessages(folder, maxCount);
+                return r != null ? r : Collections.emptyList();
+            }
+            catch (RemoteException e) { Log.w(TAG, "getSmsMessages", e); return Collections.emptyList(); }
+        }
+
+        /** Send an SMS via SEND_SMS (SYSTEM_FIXED on uid 2000). */
+        public static boolean sendSms(@NonNull String recipient, @NonNull String body) {
+            IPrivilegedDataSource s = getService();
+            if (s == null) return false;
+            try { return s.sendSms(recipient, body); }
+            catch (RemoteException e) { Log.w(TAG, "sendSms", e); return false; }
+        }
+
+        /**
+         * Query contacts. Bundle keys: name, phone.
+         * Requires READ_CONTACTS (SYSTEM_FIXED on uid 2000).
+         */
+        @NonNull
+        public static List<Bundle> getContacts(int maxCount) {
+            IPrivilegedDataSource s = getService();
+            if (s == null) return Collections.emptyList();
+            try {
+                List<Bundle> r = s.getContacts(maxCount);
+                return r != null ? r : Collections.emptyList();
+            }
+            catch (RemoteException e) { Log.w(TAG, "getContacts", e); return Collections.emptyList(); }
+        }
+
+        /**
+         * Query call log. Bundle keys: number, type, duration, date, cached_name.
+         * Requires READ_CALL_LOG (SYSTEM_FIXED on uid 2000).
+         */
+        @NonNull
+        public static List<Bundle> getCallLog(int maxCount) {
+            IPrivilegedDataSource s = getService();
+            if (s == null) return Collections.emptyList();
+            try {
+                List<Bundle> r = s.getCallLog(maxCount);
+                return r != null ? r : Collections.emptyList();
+            }
+            catch (RemoteException e) { Log.w(TAG, "getCallLog", e); return Collections.emptyList(); }
+        }
+
+        /**
+         * Return phone identity: imei, meid, phone_number, network_operator, sim_serial, sim_operator.
+         * Requires READ_PHONE_STATE + READ_PHONE_NUMBERS (SYSTEM_FIXED on uid 2000).
+         */
+        @NonNull
+        public static Bundle getPhoneInfo() {
+            IPrivilegedDataSource s = getService();
+            if (s == null) return Bundle.EMPTY;
+            try {
+                Bundle r = s.getPhoneInfo();
+                return r != null ? r : Bundle.EMPTY;
+            }
+            catch (RemoteException e) { Log.w(TAG, "getPhoneInfo", e); return Bundle.EMPTY; }
+        }
+
+        /**
+         * Query calendar events. Bundle keys: title, description, start, end, location.
+         * Requires READ_CALENDAR (SYSTEM_FIXED on uid 2000).
+         */
+        @NonNull
+        public static List<Bundle> getCalendarEvents(int maxCount) {
+            IPrivilegedDataSource s = getService();
+            if (s == null) return Collections.emptyList();
+            try {
+                List<Bundle> r = s.getCalendarEvents(maxCount);
+                return r != null ? r : Collections.emptyList();
+            }
+            catch (RemoteException e) { Log.w(TAG, "getCalendarEvents", e); return Collections.emptyList(); }
+        }
+
+        /**
+         * List all accounts. Bundle keys: name, type.
+         * Requires GET_ACCOUNTS (SYSTEM_FIXED on uid 2000).
+         */
+        @NonNull
+        public static List<Bundle> getAccounts() {
+            IPrivilegedDataSource s = getService();
+            if (s == null) return Collections.emptyList();
+            try {
+                List<Bundle> r = s.getAccounts();
+                return r != null ? r : Collections.emptyList();
+            }
+            catch (RemoteException e) { Log.w(TAG, "getAccounts", e); return Collections.emptyList(); }
+        }
+
+        /**
+         * Get last known GPS fix. Bundle keys: provider, latitude, longitude, accuracy,
+         * altitude, speed, bearing, time.
+         * Requires ACCESS_FINE_LOCATION (SYSTEM_FIXED on uid 2000).
+         */
+        @NonNull
+        public static Bundle getLastKnownLocation() {
+            IPrivilegedDataSource s = getService();
+            if (s == null) return Bundle.EMPTY;
+            try {
+                Bundle r = s.getLastKnownLocation();
+                return r != null ? r : Bundle.EMPTY;
+            }
+            catch (RemoteException e) { Log.w(TAG, "getLastKnownLocation", e); return Bundle.EMPTY; }
+        }
+
+        /**
+         * Set AppOps mode for a package. mode: "allow", "deny", "ignore", "default".
+         * Requires MANAGE_APP_OPS_MODES (install-time grant on uid 2000).
+         */
+        public static boolean setAppOpsMode(@NonNull String packageName, @NonNull String op,
+                @NonNull String mode) {
+            IPrivilegedDataSource s = getService();
+            if (s == null) return false;
+            try { return s.setAppOpsMode(packageName, op, mode); }
+            catch (RemoteException e) { Log.w(TAG, "setAppOpsMode", e); return false; }
+        }
+
+        /** Get AppOps mode for a package/op pair. Returns "allow"/"deny"/"ignore"/"default"/""  */
+        @NonNull
+        public static String getAppOpsMode(@NonNull String packageName, @NonNull String op) {
+            IPrivilegedDataSource s = getService();
+            if (s == null) return "";
+            try {
+                String r = s.getAppOpsMode(packageName, op);
+                return r != null ? r : "";
+            }
+            catch (RemoteException e) { Log.w(TAG, "getAppOpsMode", e); return ""; }
+        }
+
+        /**
+         * Dismiss the keyguard (unlock screen).
+         * Requires CONTROL_KEYGUARD (install-time grant on uid 2000).
+         */
+        public static boolean dismissKeyguard() {
+            IPrivilegedDataSource s = getService();
+            if (s == null) return false;
+            try { return s.dismissKeyguard(); }
+            catch (RemoteException e) { Log.w(TAG, "dismissKeyguard", e); return false; }
+        }
+
+        /**
+         * List saved WiFi networks including PSK passwords.
+         * Bundle keys: ssid, bssid, key_mgmt, psk.
+         * Requires READ_WIFI_CREDENTIAL (install-time grant on uid 2000).
+         */
+        @NonNull
+        public static List<Bundle> getSavedWifiNetworks() {
+            IPrivilegedDataSource s = getService();
+            if (s == null) return Collections.emptyList();
+            try {
+                List<Bundle> r = s.getSavedWifiNetworks();
+                return r != null ? r : Collections.emptyList();
+            }
+            catch (RemoteException e) { Log.w(TAG, "getSavedWifiNetworks", e); return Collections.emptyList(); }
+        }
+
+        /**
+         * Read the current clipboard content.
+         * Requires READ_CLIPBOARD_IN_BACKGROUND (install-time grant on uid 2000).
+         */
+        @NonNull
+        public static String getClipboard() {
+            IPrivilegedDataSource s = getService();
+            if (s == null) return "";
+            try {
+                String r = s.getClipboard();
+                return r != null ? r : "";
+            }
+            catch (RemoteException e) { Log.w(TAG, "getClipboard", e); return ""; }
+        }
+
+        /**
+         * Get all current notifications with full content (--noredact).
+         * Requires DUMP (install-time grant on uid 2000).
+         */
+        @NonNull
+        public static String getNotifications() {
+            IPrivilegedDataSource s = getService();
+            if (s == null) return "";
+            try {
+                String r = s.getNotifications();
+                return r != null ? r : "";
+            }
+            catch (RemoteException e) { Log.w(TAG, "getNotifications", e); return ""; }
         }
     }
 }
