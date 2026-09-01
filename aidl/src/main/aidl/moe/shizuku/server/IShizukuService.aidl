@@ -17,6 +17,7 @@ import af.shizuku.server.IPackageGovernorPlus;
 import af.shizuku.server.IDisplayTunerPlus;
 import af.shizuku.server.IAppInspector;
 import af.shizuku.server.IPrivilegedDataSource;
+import af.shizuku.server.IBackupRestorePlus;
 
 interface IShizukuService {
 
@@ -99,4 +100,6 @@ interface IShizukuService {
     IAppInspector getAppInspector() = 125;
 
     IPrivilegedDataSource getPrivilegedDataSource() = 126;
+
+    IBackupRestorePlus getBackupRestorePlus() = 127;
  }

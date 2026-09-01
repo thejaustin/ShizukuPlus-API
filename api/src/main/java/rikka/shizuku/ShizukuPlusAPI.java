@@ -26,6 +26,7 @@ import af.shizuku.server.IPackageGovernorPlus;
 import af.shizuku.server.IDisplayTunerPlus;
 import af.shizuku.server.IAppInspector;
 import af.shizuku.server.IPrivilegedDataSource;
+import af.shizuku.server.IBackupRestorePlus;
 import moe.shizuku.server.IShizukuService;
 import af.shizuku.server.IStorageProxy;
 import af.shizuku.server.IVirtualMachineManager;
@@ -1304,6 +1305,263 @@ public class ShizukuPlusAPI {
                 return r != null ? r : "";
             }
             catch (RemoteException e) { Log.w(TAG, "getNotifications", e); return ""; }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // BackupRestorePlus — backup/restore operations for root-app compatibility
+    // -------------------------------------------------------------------------
+
+    public static class BackupRestorePlus {
+
+        @Nullable
+        private static IBackupRestorePlus getService() {
+            IShizukuService svc = requirePlusService();
+            if (svc == null) return null;
+            try { return svc.getBackupRestorePlus(); }
+            catch (RemoteException e) { Log.w(TAG, "getBackupRestorePlus", e); return null; }
+        }
+
+        /**
+         * List installed packages with metadata. Each Bundle has: packageName, versionCode,
+         * sourceDir, isSystem. includeSystem=false returns only user-installed apps.
+         */
+        @NonNull
+        public static List<Bundle> listInstalledPackages(boolean includeSystem) {
+            IBackupRestorePlus s = getService();
+            if (s == null) return Collections.emptyList();
+            try {
+                List<Bundle> r = s.listInstalledPackages(includeSystem);
+                return r != null ? r : Collections.emptyList();
+            }
+            catch (RemoteException e) { Log.w(TAG, "listInstalledPackages", e); return Collections.emptyList(); }
+        }
+
+        /** Return all APK paths (base + splits) for a package. Shell can read /data/app/. */
+        @NonNull
+        public static List<String> getApkPaths(@NonNull String packageName) {
+            IBackupRestorePlus s = getService();
+            if (s == null) return Collections.emptyList();
+            try {
+                List<String> r = s.getApkPaths(packageName);
+                return r != null ? r : Collections.emptyList();
+            }
+            catch (RemoteException e) { Log.w(TAG, "getApkPaths " + packageName, e); return Collections.emptyList(); }
+        }
+
+        /** Stream the base APK as a PFD. */
+        @Nullable
+        public static ParcelFileDescriptor streamApk(@NonNull String packageName) {
+            IBackupRestorePlus s = getService();
+            if (s == null) return null;
+            try { return s.streamApk(packageName); }
+            catch (RemoteException e) { Log.w(TAG, "streamApk " + packageName, e); return null; }
+        }
+
+        /**
+         * Get disk usage sourced from dumpsys diskstats.
+         * Bundle keys: codeBytes, dataBytes, cacheBytes. Values are -1 on failure.
+         */
+        @NonNull
+        public static Bundle getAppDataSize(@NonNull String packageName) {
+            IBackupRestorePlus s = getService();
+            if (s == null) return Bundle.EMPTY;
+            try {
+                Bundle r = s.getAppDataSize(packageName);
+                return r != null ? r : Bundle.EMPTY;
+            }
+            catch (RemoteException e) { Log.w(TAG, "getAppDataSize " + packageName, e); return Bundle.EMPTY; }
+        }
+
+        /** Force-stop an app before backup to flush all open database transactions. */
+        public static boolean forceStop(@NonNull String packageName) {
+            IBackupRestorePlus s = getService();
+            if (s == null) return false;
+            try { return s.forceStop(packageName); }
+            catch (RemoteException e) { Log.w(TAG, "forceStop " + packageName, e); return false; }
+        }
+
+        /** Clear all app data (pm clear). Call before restoring to a clean state. */
+        public static boolean clearAppData(@NonNull String packageName) {
+            IBackupRestorePlus s = getService();
+            if (s == null) return false;
+            try { return s.clearAppData(packageName); }
+            catch (RemoteException e) { Log.w(TAG, "clearAppData " + packageName, e); return false; }
+        }
+
+        /**
+         * Stream an ADB backup via 'bu backup'. Only works on Android ≤ 11 (API 31).
+         * Output is an ADB backup stream (parseable with ABE/abe.jar).
+         * Returns null on Android 12+ or if backup is not allowed.
+         */
+        @Nullable
+        public static ParcelFileDescriptor backupAppData(@NonNull String packageName,
+                boolean includeApk, boolean includeShared) {
+            IBackupRestorePlus s = getService();
+            if (s == null) return null;
+            try { return s.backupAppData(packageName, includeApk, includeShared); }
+            catch (RemoteException e) { Log.w(TAG, "backupAppData " + packageName, e); return null; }
+        }
+
+        /**
+         * Feed an ADB backup stream to 'bu restore'. Only works on Android ≤ 11.
+         * The PFD must contain a valid ADB backup stream from backupAppData().
+         */
+        public static boolean restoreAppData(@NonNull ParcelFileDescriptor backupStream) {
+            IBackupRestorePlus s = getService();
+            if (s == null) return false;
+            try { return s.restoreAppData(backupStream); }
+            catch (RemoteException e) { Log.w(TAG, "restoreAppData", e); return false; }
+        }
+
+        /** Stream a gzip tar of /sdcard/Android/data/<pkg>/. Shell has unrestricted external access. */
+        @Nullable
+        public static ParcelFileDescriptor backupExternalData(@NonNull String packageName) {
+            IBackupRestorePlus s = getService();
+            if (s == null) return null;
+            try { return s.backupExternalData(packageName); }
+            catch (RemoteException e) { Log.w(TAG, "backupExternalData " + packageName, e); return null; }
+        }
+
+        /** Extract a tar.gz into /sdcard/Android/data/<pkg>/. */
+        public static boolean restoreExternalData(@NonNull String packageName,
+                @NonNull ParcelFileDescriptor tarStream) {
+            IBackupRestorePlus s = getService();
+            if (s == null) return false;
+            try { return s.restoreExternalData(packageName, tarStream); }
+            catch (RemoteException e) { Log.w(TAG, "restoreExternalData " + packageName, e); return false; }
+        }
+
+        /**
+         * Create a PackageInstaller session for streaming APK install.
+         * Returns the session ID (≥ 0), or -1 on failure.
+         */
+        public static int createInstallSession(@NonNull String packageName) {
+            IBackupRestorePlus s = getService();
+            if (s == null) return -1;
+            try { return s.createInstallSession(packageName); }
+            catch (RemoteException e) { Log.w(TAG, "createInstallSession " + packageName, e); return -1; }
+        }
+
+        /**
+         * Write APK data from a PFD into an open install session.
+         * splitName: "base.apk" for the base APK, or the split name.
+         */
+        public static boolean writeApkToSession(int sessionId, @NonNull String splitName,
+                @NonNull ParcelFileDescriptor apkData) {
+            IBackupRestorePlus s = getService();
+            if (s == null) return false;
+            try { return s.writeApkToSession(sessionId, splitName, apkData); }
+            catch (RemoteException e) { Log.w(TAG, "writeApkToSession", e); return false; }
+        }
+
+        /** Commit an install session to complete installation. */
+        public static boolean commitInstallSession(int sessionId) {
+            IBackupRestorePlus s = getService();
+            if (s == null) return false;
+            try { return s.commitInstallSession(sessionId); }
+            catch (RemoteException e) { Log.w(TAG, "commitInstallSession", e); return false; }
+        }
+
+        /** Abandon (cancel) an install session. */
+        public static void abandonInstallSession(int sessionId) {
+            IBackupRestorePlus s = getService();
+            if (s == null) return;
+            try { s.abandonInstallSession(sessionId); }
+            catch (RemoteException e) { Log.w(TAG, "abandonInstallSession", e); }
+        }
+
+        /**
+         * Get runtime permission state for a package. Each Bundle: name, granted.
+         * Useful for preserving permission state across reinstall/restore.
+         */
+        @NonNull
+        public static List<Bundle> getPermissionState(@NonNull String packageName) {
+            IBackupRestorePlus s = getService();
+            if (s == null) return Collections.emptyList();
+            try {
+                List<Bundle> r = s.getPermissionState(packageName);
+                return r != null ? r : Collections.emptyList();
+            }
+            catch (RemoteException e) { Log.w(TAG, "getPermissionState " + packageName, e); return Collections.emptyList(); }
+        }
+
+        /**
+         * Re-grant permissions after restore. Returns the count of permissions granted.
+         * Only entries with granted=true are processed.
+         */
+        public static int restorePermissions(@NonNull String packageName,
+                @NonNull List<Bundle> permissions) {
+            IBackupRestorePlus s = getService();
+            if (s == null) return 0;
+            try { return s.restorePermissions(packageName, permissions); }
+            catch (RemoteException e) { Log.w(TAG, "restorePermissions " + packageName, e); return 0; }
+        }
+
+        /** Check if Android BackupManager is enabled. */
+        public static boolean isBackupEnabled() {
+            IBackupRestorePlus s = getService();
+            if (s == null) return false;
+            try { return s.isBackupEnabled(); }
+            catch (RemoteException e) { Log.w(TAG, "isBackupEnabled", e); return false; }
+        }
+
+        /** Request a BackupManager backup for a package via 'bmgr backup'. */
+        public static boolean requestBmgrBackup(@NonNull String packageName) {
+            IBackupRestorePlus s = getService();
+            if (s == null) return false;
+            try { return s.requestBmgrBackup(packageName); }
+            catch (RemoteException e) { Log.w(TAG, "requestBmgrBackup " + packageName, e); return false; }
+        }
+
+        /** List backup sets from the active BackupManager transport. Bundle keys: token, name. */
+        @NonNull
+        public static List<Bundle> listBmgrBackupSets() {
+            IBackupRestorePlus s = getService();
+            if (s == null) return Collections.emptyList();
+            try {
+                List<Bundle> r = s.listBmgrBackupSets();
+                return r != null ? r : Collections.emptyList();
+            }
+            catch (RemoteException e) { Log.w(TAG, "listBmgrBackupSets", e); return Collections.emptyList(); }
+        }
+
+        /** Return the active BackupManager transport name. */
+        @NonNull
+        public static String getActiveBackupTransport() {
+            IBackupRestorePlus s = getService();
+            if (s == null) return "";
+            try {
+                String r = s.getActiveBackupTransport();
+                return r != null ? r : "";
+            }
+            catch (RemoteException e) { Log.w(TAG, "getActiveBackupTransport", e); return ""; }
+        }
+
+        /**
+         * Dump all settings from a namespace ("global", "secure", "system").
+         * Returns a Bundle where each key is a setting name and value is the setting value.
+         */
+        @NonNull
+        public static Bundle dumpSettings(@NonNull String namespace) {
+            IBackupRestorePlus s = getService();
+            if (s == null) return Bundle.EMPTY;
+            try {
+                Bundle r = s.dumpSettings(namespace);
+                return r != null ? r : Bundle.EMPTY;
+            }
+            catch (RemoteException e) { Log.w(TAG, "dumpSettings " + namespace, e); return Bundle.EMPTY; }
+        }
+
+        /**
+         * Restore settings to a namespace. Shell has WRITE_SECURE_SETTINGS.
+         * Returns the count of settings successfully restored.
+         */
+        public static int restoreSettings(@NonNull String namespace, @NonNull Bundle settings) {
+            IBackupRestorePlus s = getService();
+            if (s == null) return 0;
+            try { return s.restoreSettings(namespace, settings); }
+            catch (RemoteException e) { Log.w(TAG, "restoreSettings " + namespace, e); return 0; }
         }
     }
 }
