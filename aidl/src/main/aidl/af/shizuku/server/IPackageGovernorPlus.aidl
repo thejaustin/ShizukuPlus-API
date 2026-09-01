@@ -59,4 +59,22 @@ interface IPackageGovernorPlus {
      * Returns false if the path is null/blank or install fails.
      */
     boolean installApk(String apkPath);
+
+    /**
+     * Check if an app is debuggable (android:debuggable="true" in its manifest).
+     * Debuggable apps can be accessed via run-as, enabling full data directory read.
+     */
+    boolean isAppDebuggable(String packageName);
+
+    /**
+     * Check if an app has android:allowBackup="true" in its manifest.
+     * Apps with backup allowed can be backed up via BackupManager.
+     */
+    boolean isBackupAllowed(String packageName);
+
+    /**
+     * Return the primary data directory path for a package (e.g. /data/data/com.example.app).
+     * Returns null if the package is not installed.
+     */
+    String getAppDataDir(String packageName);
 }

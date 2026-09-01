@@ -695,6 +695,31 @@ public class ShizukuPlusAPI {
             try { return s.getFileInfo(path); }
             catch (RemoteException e) { Log.w(TAG, "getFileInfo " + path, e); return null; }
         }
+
+        public static boolean copyFile(@NonNull String srcPath, @NonNull String destPath) {
+            IStorageProxy s = getService();
+            if (s == null) return false;
+            try { return s.copyFile(srcPath, destPath); }
+            catch (RemoteException e) { Log.w(TAG, "copyFile " + srcPath, e); return false; }
+        }
+
+        @Nullable
+        public static ParcelFileDescriptor openContentUri(@NonNull String contentUri) {
+            IStorageProxy s = getService();
+            if (s == null) return null;
+            try { return s.openContentUri(contentUri); }
+            catch (RemoteException e) { Log.w(TAG, "openContentUri " + contentUri, e); return null; }
+        }
+
+        /** Stream a gzip-compressed tar of {@code dirPath}. Pass {@code packageName} when
+         *  targeting a debuggable app's private data dir so run-as can be used. */
+        @Nullable
+        public static ParcelFileDescriptor tarDirectory(@NonNull String dirPath, @Nullable String packageName) {
+            IStorageProxy s = getService();
+            if (s == null) return null;
+            try { return s.tarDirectory(dirPath, packageName); }
+            catch (RemoteException e) { Log.w(TAG, "tarDirectory " + dirPath, e); return null; }
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -798,6 +823,31 @@ public class ShizukuPlusAPI {
             if (s == null) return false;
             try { return s.installApk(apkPath); }
             catch (RemoteException e) { Log.w(TAG, "installApk " + apkPath, e); return false; }
+        }
+
+        /** Returns true if the app has android:debuggable="true" (and can be accessed via run-as). */
+        public static boolean isAppDebuggable(@NonNull String packageName) {
+            IPackageGovernorPlus s = getService();
+            if (s == null) return false;
+            try { return s.isAppDebuggable(packageName); }
+            catch (RemoteException e) { Log.w(TAG, "isAppDebuggable " + packageName, e); return false; }
+        }
+
+        /** Returns true if the app declares android:allowBackup="true". */
+        public static boolean isBackupAllowed(@NonNull String packageName) {
+            IPackageGovernorPlus s = getService();
+            if (s == null) return false;
+            try { return s.isBackupAllowed(packageName); }
+            catch (RemoteException e) { Log.w(TAG, "isBackupAllowed " + packageName, e); return false; }
+        }
+
+        /** Returns the app's primary data directory (e.g. /data/data/com.example.app), or null. */
+        @Nullable
+        public static String getAppDataDir(@NonNull String packageName) {
+            IPackageGovernorPlus s = getService();
+            if (s == null) return null;
+            try { return s.getAppDataDir(packageName); }
+            catch (RemoteException e) { Log.w(TAG, "getAppDataDir " + packageName, e); return null; }
         }
     }
 
