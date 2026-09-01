@@ -24,6 +24,7 @@ import af.shizuku.server.IOverlayManagerPlus;
 import af.shizuku.server.IStatusBarGovernorPlus;
 import af.shizuku.server.IPackageGovernorPlus;
 import af.shizuku.server.IDisplayTunerPlus;
+import af.shizuku.server.IAppInspector;
 import moe.shizuku.server.IShizukuService;
 import af.shizuku.server.IStorageProxy;
 import af.shizuku.server.IVirtualMachineManager;
@@ -918,6 +919,138 @@ public class ShizukuPlusAPI {
             if (s == null) return -1;
             try { return s.getPhysicalDensity(); }
             catch (RemoteException e) { Log.w(TAG, "getPhysicalDensity", e); return -1; }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // AppInspector — non-obvious uid-2000-accessible data and observation APIs
+    // -------------------------------------------------------------------------
+
+    public static class AppInspector {
+
+        @Nullable
+        private static IAppInspector getService() {
+            IShizukuService svc = requirePlusService();
+            if (svc == null) return null;
+            try { return svc.getAppInspector(); }
+            catch (RemoteException e) { Log.w(TAG, "getAppInspector", e); return null; }
+        }
+
+        /** Stream a raw ADB backup for packageName via 'bu backup' (works on Android ≤ 11). */
+        @Nullable
+        public static ParcelFileDescriptor backupViaSystemAgent(@NonNull String packageName) {
+            IAppInspector s = getService();
+            if (s == null) return null;
+            try { return s.backupViaSystemAgent(packageName); }
+            catch (RemoteException e) { Log.w(TAG, "backupViaSystemAgent " + packageName, e); return null; }
+        }
+
+        /** Dump heap of a running process to an HPROF file. May fail without root on strict configs. */
+        public static boolean dumpHeap(int pid, @NonNull String destPath) {
+            IAppInspector s = getService();
+            if (s == null) return false;
+            try { return s.dumpHeap(pid, destPath); }
+            catch (RemoteException e) { Log.w(TAG, "dumpHeap " + pid, e); return false; }
+        }
+
+        /** Read recent logcat lines, filtered to packageName's process(es) if non-null. */
+        @NonNull
+        public static String readLogcat(@Nullable String packageName, int maxLines) {
+            IAppInspector s = getService();
+            if (s == null) return "";
+            try {
+                String r = s.readLogcat(packageName, maxLines);
+                return r != null ? r : "";
+            }
+            catch (RemoteException e) { Log.w(TAG, "readLogcat", e); return ""; }
+        }
+
+        /** List all file paths currently open by a process (/proc/<pid>/fd/ symlinks). */
+        @NonNull
+        public static List<String> getOpenFiles(int pid) {
+            IAppInspector s = getService();
+            if (s == null) return Collections.emptyList();
+            try {
+                List<String> r = s.getOpenFiles(pid);
+                return r != null ? r : Collections.emptyList();
+            }
+            catch (RemoteException e) { Log.w(TAG, "getOpenFiles " + pid, e); return Collections.emptyList(); }
+        }
+
+        /** List exported content provider authorities for a package. */
+        @NonNull
+        public static List<String> getExportedProviders(@NonNull String packageName) {
+            IAppInspector s = getService();
+            if (s == null) return Collections.emptyList();
+            try {
+                List<String> r = s.getExportedProviders(packageName);
+                return r != null ? r : Collections.emptyList();
+            }
+            catch (RemoteException e) { Log.w(TAG, "getExportedProviders " + packageName, e); return Collections.emptyList(); }
+        }
+
+        /** Invoke a method on an exported content provider ('content call'). */
+        @NonNull
+        public static Bundle callContentProvider(@NonNull String uri, @Nullable String method, @Nullable String arg) {
+            IAppInspector s = getService();
+            if (s == null) return Bundle.EMPTY;
+            try {
+                Bundle r = s.callContentProvider(uri, method, arg);
+                return r != null ? r : Bundle.EMPTY;
+            }
+            catch (RemoteException e) { Log.w(TAG, "callContentProvider " + uri, e); return Bundle.EMPTY; }
+        }
+
+        /** Query an exported content provider and return rows as Bundles. */
+        @NonNull
+        public static List<Bundle> queryContentProvider(@NonNull String uri, @Nullable String projection) {
+            IAppInspector s = getService();
+            if (s == null) return Collections.emptyList();
+            try {
+                List<Bundle> r = s.queryContentProvider(uri, projection);
+                return r != null ? r : Collections.emptyList();
+            }
+            catch (RemoteException e) { Log.w(TAG, "queryContentProvider " + uri, e); return Collections.emptyList(); }
+        }
+
+        /** Get dumpsys output for a named service. Useful: 'package', 'meminfo', 'account', 'dropbox'. */
+        @NonNull
+        public static String getDumpsys(@NonNull String serviceName) {
+            IAppInspector s = getService();
+            if (s == null) return "";
+            try {
+                String r = s.getDumpsys(serviceName);
+                return r != null ? r : "";
+            }
+            catch (RemoteException e) { Log.w(TAG, "getDumpsys " + serviceName, e); return ""; }
+        }
+
+        /**
+         * Read a whitelisted /proc/pid/ file.
+         * Allowed filenames: maps, status, cmdline, comm, oom_score, oom_adj,
+         * smaps_rollup, net/tcp, net/tcp6, net/unix, net/udp6.
+         */
+        @NonNull
+        public static String readProcFile(int pid, @NonNull String filename) {
+            IAppInspector s = getService();
+            if (s == null) return "";
+            try {
+                String r = s.readProcFile(pid, filename);
+                return r != null ? r : "";
+            }
+            catch (RemoteException e) { Log.w(TAG, "readProcFile " + pid + "/" + filename, e); return ""; }
+        }
+
+        /** Return a Bundle mapping running app package names to their primary PID. */
+        @NonNull
+        public static Bundle getRunningAppPids() {
+            IAppInspector s = getService();
+            if (s == null) return Bundle.EMPTY;
+            try {
+                Bundle r = s.getRunningAppPids();
+                return r != null ? r : Bundle.EMPTY;
+            }
+            catch (RemoteException e) { Log.w(TAG, "getRunningAppPids", e); return Bundle.EMPTY; }
         }
     }
 }

@@ -15,6 +15,7 @@ import af.shizuku.server.IActivityManagerPlus;
 import af.shizuku.server.IStatusBarGovernorPlus;
 import af.shizuku.server.IPackageGovernorPlus;
 import af.shizuku.server.IDisplayTunerPlus;
+import af.shizuku.server.IAppInspector;
 
 interface IShizukuService {
 
@@ -93,4 +94,6 @@ interface IShizukuService {
     IPackageGovernorPlus getPackageGovernorPlus() = 123;
 
     IDisplayTunerPlus getDisplayTunerPlus() = 124;
+
+    IAppInspector getAppInspector() = 125;
  }
