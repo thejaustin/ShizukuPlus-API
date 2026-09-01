@@ -25,4 +25,25 @@ interface IStatusBarGovernorPlus {
 
     /** Expand the settings panel (Quick Settings) — used for delegating to system for unsupported tiles. */
     boolean expandSettings();
+
+    /**
+     * Add a tile to the Quick Settings panel (appended after existing tiles).
+     * Spec format: system tiles use short names ("wifi", "bt", "airplane", "dnd", "flashlight",
+     * "rotation", "nfc", "internet"); custom tiles use "custom(com.pkg/.TileService)".
+     * No-op if the tile is already present.
+     */
+    boolean addTile(String tileSpec);
+
+    /**
+     * Remove a tile from the Quick Settings panel.
+     * No-op if the tile is not present.
+     */
+    boolean removeTile(String tileSpec);
+
+    /**
+     * Move an existing tile to a specific zero-based position in the QS panel.
+     * If the tile isn't present it is inserted at that position.
+     * Clamps to valid range automatically.
+     */
+    boolean moveTileToPosition(String tileSpec, int position);
 }

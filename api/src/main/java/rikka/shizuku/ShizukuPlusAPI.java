@@ -22,6 +22,8 @@ import af.shizuku.server.IContinuityBridge;
 import af.shizuku.server.INetworkGovernorPlus;
 import af.shizuku.server.IOverlayManagerPlus;
 import af.shizuku.server.IStatusBarGovernorPlus;
+import af.shizuku.server.IPackageGovernorPlus;
+import af.shizuku.server.IDisplayTunerPlus;
 import moe.shizuku.server.IShizukuService;
 import af.shizuku.server.IStorageProxy;
 import af.shizuku.server.IVirtualMachineManager;
@@ -451,6 +453,34 @@ public class ShizukuPlusAPI {
             try { return s.expandSettings(); }
             catch (RemoteException e) { Log.w(TAG, "expandSettings", e); return false; }
         }
+
+        /**
+         * Add a tile to the Quick Settings panel.
+         * System tile specs: "wifi", "bt", "airplane", "dnd", "flashlight", "rotation", "nfc", "internet"
+         * Custom tile specs: "custom(com.pkg/.TileService)"
+         */
+        public static boolean addTile(@NonNull String tileSpec) {
+            IStatusBarGovernorPlus s = getService();
+            if (s == null) return false;
+            try { return s.addTile(tileSpec); }
+            catch (RemoteException e) { Log.w(TAG, "addTile " + tileSpec, e); return false; }
+        }
+
+        /** Remove a tile from the Quick Settings panel. */
+        public static boolean removeTile(@NonNull String tileSpec) {
+            IStatusBarGovernorPlus s = getService();
+            if (s == null) return false;
+            try { return s.removeTile(tileSpec); }
+            catch (RemoteException e) { Log.w(TAG, "removeTile " + tileSpec, e); return false; }
+        }
+
+        /** Move a tile to a specific zero-based position in the QS panel. */
+        public static boolean moveTileToPosition(@NonNull String tileSpec, int position) {
+            IStatusBarGovernorPlus s = getService();
+            if (s == null) return false;
+            try { return s.moveTileToPosition(tileSpec, position); }
+            catch (RemoteException e) { Log.w(TAG, "moveTileToPosition " + tileSpec, e); return false; }
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -681,6 +711,163 @@ public class ShizukuPlusAPI {
 
         public static boolean isAvailable() {
             return getBinder() != null;
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // PackageGovernor — runtime permission management + privileged package ops
+    // -------------------------------------------------------------------------
+
+    /**
+     * Privileged package operations: runtime permission grant/revoke, user-scoped
+     * uninstall/restore for system apps, app suspension, and silent APK install.
+     * All available to the ADB/shell process without root.
+     */
+    public static class PackageGovernor {
+
+        @Nullable
+        private static IPackageGovernorPlus getService() {
+            IShizukuService svc = requirePlusService();
+            if (svc == null) return null;
+            try { return svc.getPackageGovernorPlus(); }
+            catch (RemoteException e) { Log.w(TAG, "getPackageGovernorPlus", e); return null; }
+        }
+
+        public static boolean grantPermission(@NonNull String packageName, @NonNull String permission) {
+            IPackageGovernorPlus s = getService();
+            if (s == null) return false;
+            try { return s.grantPermission(packageName, permission); }
+            catch (RemoteException e) { Log.w(TAG, "grantPermission " + packageName + "/" + permission, e); return false; }
+        }
+
+        public static boolean revokePermission(@NonNull String packageName, @NonNull String permission) {
+            IPackageGovernorPlus s = getService();
+            if (s == null) return false;
+            try { return s.revokePermission(packageName, permission); }
+            catch (RemoteException e) { Log.w(TAG, "revokePermission " + packageName + "/" + permission, e); return false; }
+        }
+
+        @NonNull
+        public static List<String> getGrantedPermissions(@NonNull String packageName) {
+            IPackageGovernorPlus s = getService();
+            if (s == null) return Collections.emptyList();
+            try {
+                List<String> result = s.getGrantedPermissions(packageName);
+                return result != null ? result : Collections.emptyList();
+            }
+            catch (RemoteException e) { Log.w(TAG, "getGrantedPermissions " + packageName, e); return Collections.emptyList(); }
+        }
+
+        public static boolean uninstallForUser(@NonNull String packageName) {
+            IPackageGovernorPlus s = getService();
+            if (s == null) return false;
+            try { return s.uninstallForUser(packageName); }
+            catch (RemoteException e) { Log.w(TAG, "uninstallForUser " + packageName, e); return false; }
+        }
+
+        public static boolean restoreSystemApp(@NonNull String packageName) {
+            IPackageGovernorPlus s = getService();
+            if (s == null) return false;
+            try { return s.restoreSystemApp(packageName); }
+            catch (RemoteException e) { Log.w(TAG, "restoreSystemApp " + packageName, e); return false; }
+        }
+
+        public static boolean suspendApp(@NonNull String packageName) {
+            IPackageGovernorPlus s = getService();
+            if (s == null) return false;
+            try { return s.suspendApp(packageName); }
+            catch (RemoteException e) { Log.w(TAG, "suspendApp " + packageName, e); return false; }
+        }
+
+        public static boolean unsuspendApp(@NonNull String packageName) {
+            IPackageGovernorPlus s = getService();
+            if (s == null) return false;
+            try { return s.unsuspendApp(packageName); }
+            catch (RemoteException e) { Log.w(TAG, "unsuspendApp " + packageName, e); return false; }
+        }
+
+        public static boolean isAppSuspended(@NonNull String packageName) {
+            IPackageGovernorPlus s = getService();
+            if (s == null) return false;
+            try { return s.isAppSuspended(packageName); }
+            catch (RemoteException e) { Log.w(TAG, "isAppSuspended " + packageName, e); return false; }
+        }
+
+        public static boolean installApk(@NonNull String apkPath) {
+            IPackageGovernorPlus s = getService();
+            if (s == null) return false;
+            try { return s.installApk(apkPath); }
+            catch (RemoteException e) { Log.w(TAG, "installApk " + apkPath, e); return false; }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // DisplayTuner — display resolution and density override
+    // -------------------------------------------------------------------------
+
+    /**
+     * Override display resolution and DPI — the same as `adb shell wm size/density`,
+     * exposed as a clean IPC interface so apps under Shizuku can control display
+     * layout without requiring direct ADB access.
+     */
+    public static class DisplayTuner {
+
+        @Nullable
+        private static IDisplayTunerPlus getService() {
+            IShizukuService svc = requirePlusService();
+            if (svc == null) return null;
+            try { return svc.getDisplayTunerPlus(); }
+            catch (RemoteException e) { Log.w(TAG, "getDisplayTunerPlus", e); return null; }
+        }
+
+        public static boolean setDisplaySize(int width, int height) {
+            IDisplayTunerPlus s = getService();
+            if (s == null) return false;
+            try { return s.setDisplaySize(width, height); }
+            catch (RemoteException e) { Log.w(TAG, "setDisplaySize", e); return false; }
+        }
+
+        public static boolean resetDisplaySize() {
+            IDisplayTunerPlus s = getService();
+            if (s == null) return false;
+            try { return s.resetDisplaySize(); }
+            catch (RemoteException e) { Log.w(TAG, "resetDisplaySize", e); return false; }
+        }
+
+        public static boolean setDisplayDensity(int dpi) {
+            IDisplayTunerPlus s = getService();
+            if (s == null) return false;
+            try { return s.setDisplayDensity(dpi); }
+            catch (RemoteException e) { Log.w(TAG, "setDisplayDensity", e); return false; }
+        }
+
+        public static boolean resetDisplayDensity() {
+            IDisplayTunerPlus s = getService();
+            if (s == null) return false;
+            try { return s.resetDisplayDensity(); }
+            catch (RemoteException e) { Log.w(TAG, "resetDisplayDensity", e); return false; }
+        }
+
+        @Nullable
+        public static Bundle getDisplaySize() {
+            IDisplayTunerPlus s = getService();
+            if (s == null) return null;
+            try { return s.getDisplaySize(); }
+            catch (RemoteException e) { Log.w(TAG, "getDisplaySize", e); return null; }
+        }
+
+        public static int getDisplayDensity() {
+            IDisplayTunerPlus s = getService();
+            if (s == null) return -1;
+            try { return s.getDisplayDensity(); }
+            catch (RemoteException e) { Log.w(TAG, "getDisplayDensity", e); return -1; }
+        }
+
+        public static int getPhysicalDensity() {
+            IDisplayTunerPlus s = getService();
+            if (s == null) return -1;
+            try { return s.getPhysicalDensity(); }
+            catch (RemoteException e) { Log.w(TAG, "getPhysicalDensity", e); return -1; }
         }
     }
 }

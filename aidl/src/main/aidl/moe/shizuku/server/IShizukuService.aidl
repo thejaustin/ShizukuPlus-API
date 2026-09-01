@@ -13,6 +13,8 @@ import af.shizuku.server.IOverlayManagerPlus;
 import af.shizuku.server.INetworkGovernorPlus;
 import af.shizuku.server.IActivityManagerPlus;
 import af.shizuku.server.IStatusBarGovernorPlus;
+import af.shizuku.server.IPackageGovernorPlus;
+import af.shizuku.server.IDisplayTunerPlus;
 
 interface IShizukuService {
 
@@ -87,4 +89,8 @@ interface IShizukuService {
     void registerAIAutomationBridge(in IAIAutomationBridge bridge) = 121;
 
     IStatusBarGovernorPlus getStatusBarGovernorPlus() = 122;
+
+    IPackageGovernorPlus getPackageGovernorPlus() = 123;
+
+    IDisplayTunerPlus getDisplayTunerPlus() = 124;
  }
