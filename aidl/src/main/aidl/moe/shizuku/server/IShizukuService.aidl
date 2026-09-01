@@ -12,6 +12,7 @@ import af.shizuku.server.IContinuityBridge;
 import af.shizuku.server.IOverlayManagerPlus;
 import af.shizuku.server.INetworkGovernorPlus;
 import af.shizuku.server.IActivityManagerPlus;
+import af.shizuku.server.IStatusBarGovernorPlus;
 
 interface IShizukuService {
 
@@ -84,4 +85,6 @@ interface IShizukuService {
     boolean isPlusFeatureEnabled(String key) = 120;
 
     void registerAIAutomationBridge(in IAIAutomationBridge bridge) = 121;
+
+    IStatusBarGovernorPlus getStatusBarGovernorPlus() = 122;
  }

@@ -21,6 +21,7 @@ import af.shizuku.server.IAICorePlus;
 import af.shizuku.server.IContinuityBridge;
 import af.shizuku.server.INetworkGovernorPlus;
 import af.shizuku.server.IOverlayManagerPlus;
+import af.shizuku.server.IStatusBarGovernorPlus;
 import moe.shizuku.server.IShizukuService;
 import af.shizuku.server.IStorageProxy;
 import af.shizuku.server.IVirtualMachineManager;
@@ -383,6 +384,72 @@ public class ShizukuPlusAPI {
             if (s == null) return false;
             try { return s.isAppNetworkRestricted(packageName); }
             catch (RemoteException e) { Log.w(TAG, "isAppNetworkRestricted " + packageName, e); return false; }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // StatusBarGovernor — requires enhanced API
+    // -------------------------------------------------------------------------
+
+    /** Privileged status bar control: expand/collapse shade, click and manage Quick Settings tiles. */
+    public static class StatusBarGovernor {
+
+        @Nullable
+        private static IStatusBarGovernorPlus getService() {
+            IShizukuService svc = requirePlusService();
+            if (svc == null) return null;
+            try { return svc.getStatusBarGovernorPlus(); }
+            catch (RemoteException e) { Log.w(TAG, "getStatusBarGovernorPlus", e); return null; }
+        }
+
+        public static boolean disableExpansion() {
+            IStatusBarGovernorPlus s = getService();
+            if (s == null) return false;
+            try { return s.disableExpansion(); }
+            catch (RemoteException e) { Log.w(TAG, "disableExpansion", e); return false; }
+        }
+
+        public static boolean enableExpansion() {
+            IStatusBarGovernorPlus s = getService();
+            if (s == null) return false;
+            try { return s.enableExpansion(); }
+            catch (RemoteException e) { Log.w(TAG, "enableExpansion", e); return false; }
+        }
+
+        public static boolean clickTile(@NonNull String component) {
+            IStatusBarGovernorPlus s = getService();
+            if (s == null) return false;
+            try { return s.clickTile(component); }
+            catch (RemoteException e) { Log.w(TAG, "clickTile " + component, e); return false; }
+        }
+
+        @Nullable
+        public static String getCurrentTiles() {
+            IStatusBarGovernorPlus s = getService();
+            if (s == null) return null;
+            try { return s.getCurrentTiles(); }
+            catch (RemoteException e) { Log.w(TAG, "getCurrentTiles", e); return null; }
+        }
+
+        public static boolean setTiles(@NonNull String tileList) {
+            IStatusBarGovernorPlus s = getService();
+            if (s == null) return false;
+            try { return s.setTiles(tileList); }
+            catch (RemoteException e) { Log.w(TAG, "setTiles", e); return false; }
+        }
+
+        public static boolean collapse() {
+            IStatusBarGovernorPlus s = getService();
+            if (s == null) return false;
+            try { return s.collapse(); }
+            catch (RemoteException e) { Log.w(TAG, "collapse", e); return false; }
+        }
+
+        public static boolean expandSettings() {
+            IStatusBarGovernorPlus s = getService();
+            if (s == null) return false;
+            try { return s.expandSettings(); }
+            catch (RemoteException e) { Log.w(TAG, "expandSettings", e); return false; }
         }
     }
 
