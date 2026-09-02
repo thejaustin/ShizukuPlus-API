@@ -27,6 +27,7 @@ import af.shizuku.server.IDisplayTunerPlus;
 import af.shizuku.server.IAppInspector;
 import af.shizuku.server.IPrivilegedDataSource;
 import af.shizuku.server.IBackupRestorePlus;
+import af.shizuku.server.IApkPatcher;
 import moe.shizuku.server.IShizukuService;
 import af.shizuku.server.IStorageProxy;
 import af.shizuku.server.IVirtualMachineManager;
@@ -1562,6 +1563,90 @@ public class ShizukuPlusAPI {
             if (s == null) return 0;
             try { return s.restoreSettings(namespace, settings); }
             catch (RemoteException e) { Log.w(TAG, "restoreSettings " + namespace, e); return 0; }
+        }
+    }
+
+    // ── ApkPatcher — temp-debug APK trick for non-root app data access ────────
+
+    public static class ApkPatcher {
+
+        private static IApkPatcher getService() {
+            IShizukuService svc = getIShizukuServiceOrThrow();
+            try { return svc.getApkPatcher(); }
+            catch (RemoteException e) { Log.w(TAG, "getApkPatcher", e); return null; }
+        }
+
+        /**
+         * Patch the installed APK to be debuggable and reinstall (data preserved).
+         * After success, run-as <pkg> works, enabling data backup via streamDataDir.
+         */
+        public static boolean prepareTempDebug(@NonNull String packageName) {
+            IApkPatcher s = getService();
+            if (s == null) return false;
+            try { return s.prepareTempDebug(packageName); }
+            catch (RemoteException e) { Log.w(TAG, "prepareTempDebug " + packageName, e); return false; }
+        }
+
+        /**
+         * Stream /data/data/<pkg>/ as a gzip-compressed tar.
+         * Only valid after prepareTempDebug(). Returns null on failure.
+         */
+        @Nullable
+        public static ParcelFileDescriptor streamDataDir(@NonNull String packageName) {
+            IApkPatcher s = getService();
+            if (s == null) return null;
+            try { return s.streamDataDir(packageName); }
+            catch (RemoteException e) { Log.w(TAG, "streamDataDir " + packageName, e); return null; }
+        }
+
+        /**
+         * Restore a gzip-compressed tar into /data/data/<pkg>/.
+         * Only valid after prepareTempDebug().
+         */
+        public static boolean restoreDataDir(@NonNull String packageName, @NonNull ParcelFileDescriptor tarStream) {
+            IApkPatcher s = getService();
+            if (s == null) return false;
+            try { return s.restoreDataDir(packageName, tarStream); }
+            catch (RemoteException e) { Log.w(TAG, "restoreDataDir " + packageName, e); return false; }
+        }
+
+        /**
+         * Reinstall the original APK, restoring the app to its pre-patch state.
+         * App data survives. Removes temp files.
+         */
+        public static boolean restoreOriginal(@NonNull String packageName) {
+            IApkPatcher s = getService();
+            if (s == null) return false;
+            try { return s.restoreOriginal(packageName); }
+            catch (RemoteException e) { Log.w(TAG, "restoreOriginal " + packageName, e); return false; }
+        }
+
+        /**
+         * Stream the saved original APK for cross-device transfer.
+         * Returns null if prepareTempDebug has not been called.
+         */
+        @Nullable
+        public static ParcelFileDescriptor streamOriginalApk(@NonNull String packageName) {
+            IApkPatcher s = getService();
+            if (s == null) return null;
+            try { return s.streamOriginalApk(packageName); }
+            catch (RemoteException e) { Log.w(TAG, "streamOriginalApk " + packageName, e); return null; }
+        }
+
+        /** Returns true if the package is currently in temp-debug state. */
+        public static boolean isTempDebugging(@NonNull String packageName) {
+            IApkPatcher s = getService();
+            if (s == null) return false;
+            try { return s.isTempDebugging(packageName); }
+            catch (RemoteException e) { Log.w(TAG, "isTempDebugging " + packageName, e); return false; }
+        }
+
+        /** Restore all packages stuck in temp-debug state (e.g., after server crash). */
+        public static void cleanupAllTempDebug() {
+            IApkPatcher s = getService();
+            if (s == null) return;
+            try { s.cleanupAllTempDebug(); }
+            catch (RemoteException e) { Log.w(TAG, "cleanupAllTempDebug", e); }
         }
     }
 }
