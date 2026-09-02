@@ -254,4 +254,59 @@ interface IBackupRestorePlus {
      * Returns null if the APK is not found or fileName is not valid for this package.
      */
     ParcelFileDescriptor streamApkSplit(String packageName, String fileName);
+
+    // ── App Freeze / Unfreeze ─────────────────────────────────────────────────
+
+    /**
+     * Freeze an app by disabling it for the current user ('pm disable-user <pkg>').
+     * Frozen apps do not run, do not receive broadcasts, and are hidden from the launcher.
+     * Shell has CHANGE_COMPONENT_ENABLED_STATE. Does not delete any data.
+     * Returns false if the package does not exist or the call fails.
+     */
+    boolean freezeApp(String packageName);
+
+    /**
+     * Unfreeze (re-enable) a previously frozen app ('pm enable <pkg>').
+     * Returns false if the package does not exist or the call fails.
+     */
+    boolean unfreezeApp(String packageName);
+
+    /**
+     * Return true if the package is currently disabled/frozen for the current user.
+     * Parses 'pm dump <pkg>' for the enabled state field.
+     */
+    boolean isAppFrozen(String packageName);
+
+    // ── SMS Restore ───────────────────────────────────────────────────────────
+
+    /**
+     * Insert SMS messages into the system Telephony database via the content provider.
+     * Shell has WRITE_SMS (uid 2000 can write to content://sms directly).
+     *
+     * Each Bundle in the list must contain:
+     *   address (String)  — phone number
+     *   body    (String)  — message text
+     *   date    (long)    — timestamp in milliseconds since epoch
+     *   type    (int)     — 1=inbox, 2=sent, 3=draft, 5=failed, 6=queued
+     *   read    (int)     — 0=unread, 1=read
+     *
+     * Returns the count of messages successfully inserted.
+     */
+    int insertSmsMessages(in List<Bundle> messages);
+
+    // ── Permission Management ─────────────────────────────────────────────────
+
+    /**
+     * Revoke a single runtime permission from a package.
+     * Uses 'pm revoke <pkg> <permission>'. Companion to restorePermissions().
+     * Returns false if revoke fails (e.g. permission not granted or not revocable).
+     */
+    boolean revokeRuntimePermission(String packageName, String permission);
+
+    /**
+     * Grant a single runtime permission to a package.
+     * Uses 'pm grant <pkg> <permission>'. Finer-grained than restorePermissions().
+     * Returns false if grant fails.
+     */
+    boolean grantRuntimePermission(String packageName, String permission);
 }

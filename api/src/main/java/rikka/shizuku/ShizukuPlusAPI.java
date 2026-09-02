@@ -1624,6 +1624,58 @@ public class ShizukuPlusAPI {
             try { return s.streamApkSplit(packageName, fileName); }
             catch (RemoteException e) { Log.w(TAG, "streamApkSplit " + packageName + "/" + fileName, e); return null; }
         }
+
+        /** Freeze (pm disable-user) an app. Frozen apps don't run or appear in the launcher. */
+        public static boolean freezeApp(@NonNull String packageName) {
+            IBackupRestorePlus s = getService();
+            if (s == null) return false;
+            try { return s.freezeApp(packageName); }
+            catch (RemoteException e) { Log.w(TAG, "freezeApp " + packageName, e); return false; }
+        }
+
+        /** Unfreeze (pm enable) a previously frozen app. */
+        public static boolean unfreezeApp(@NonNull String packageName) {
+            IBackupRestorePlus s = getService();
+            if (s == null) return false;
+            try { return s.unfreezeApp(packageName); }
+            catch (RemoteException e) { Log.w(TAG, "unfreezeApp " + packageName, e); return false; }
+        }
+
+        /** Returns true if the app is currently disabled/frozen for the current user. */
+        public static boolean isAppFrozen(@NonNull String packageName) {
+            IBackupRestorePlus s = getService();
+            if (s == null) return false;
+            try { return s.isAppFrozen(packageName); }
+            catch (RemoteException e) { Log.w(TAG, "isAppFrozen " + packageName, e); return false; }
+        }
+
+        /**
+         * Insert SMS messages into the Telephony database. Each Bundle needs:
+         * address (String), body (String), date (long), type (int: 1=inbox/2=sent),
+         * read (int: 0=unread/1=read). Returns count inserted.
+         */
+        public static int insertSmsMessages(@NonNull List<Bundle> messages) {
+            IBackupRestorePlus s = getService();
+            if (s == null) return 0;
+            try { return s.insertSmsMessages(messages); }
+            catch (RemoteException e) { Log.w(TAG, "insertSmsMessages", e); return 0; }
+        }
+
+        /** Revoke a single runtime permission from a package. */
+        public static boolean revokeRuntimePermission(@NonNull String packageName, @NonNull String permission) {
+            IBackupRestorePlus s = getService();
+            if (s == null) return false;
+            try { return s.revokeRuntimePermission(packageName, permission); }
+            catch (RemoteException e) { Log.w(TAG, "revokeRuntimePermission", e); return false; }
+        }
+
+        /** Grant a single runtime permission to a package. */
+        public static boolean grantRuntimePermission(@NonNull String packageName, @NonNull String permission) {
+            IBackupRestorePlus s = getService();
+            if (s == null) return false;
+            try { return s.grantRuntimePermission(packageName, permission); }
+            catch (RemoteException e) { Log.w(TAG, "grantRuntimePermission", e); return false; }
+        }
     }
 
     // ── ApkPatcher — temp-debug APK trick for non-root app data access ────────
