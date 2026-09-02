@@ -1564,6 +1564,66 @@ public class ShizukuPlusAPI {
             try { return s.restoreSettings(namespace, settings); }
             catch (RemoteException e) { Log.w(TAG, "restoreSettings " + namespace, e); return 0; }
         }
+
+        /** Stream a gzip-compressed tar of /sdcard/Android/obb/<pkg>/. Null if directory absent. */
+        @Nullable
+        public static ParcelFileDescriptor backupObbData(@NonNull String packageName) {
+            IBackupRestorePlus s = getService();
+            if (s == null) return null;
+            try { return s.backupObbData(packageName); }
+            catch (RemoteException e) { Log.w(TAG, "backupObbData " + packageName, e); return null; }
+        }
+
+        /** Extract a gzip-compressed tar into /sdcard/Android/obb/<pkg>/. */
+        public static boolean restoreObbData(@NonNull String packageName, @NonNull ParcelFileDescriptor tarStream) {
+            IBackupRestorePlus s = getService();
+            if (s == null) return false;
+            try { return s.restoreObbData(packageName, tarStream); }
+            catch (RemoteException e) { Log.w(TAG, "restoreObbData " + packageName, e); return false; }
+        }
+
+        /**
+         * Detailed per-package metadata from pm dump. Keys: versionName, versionCode,
+         * targetSdk, minSdk, uid, dataDir, nativeLibDir, isSystem, isDebuggable,
+         * allowBackup, firstInstallTime, lastUpdateTime.
+         */
+        @NonNull
+        public static Bundle getPackageMetadata(@NonNull String packageName) {
+            IBackupRestorePlus s = getService();
+            if (s == null) return Bundle.EMPTY;
+            try {
+                Bundle r = s.getPackageMetadata(packageName);
+                return r != null ? r : Bundle.EMPTY;
+            }
+            catch (RemoteException e) { Log.w(TAG, "getPackageMetadata " + packageName, e); return Bundle.EMPTY; }
+        }
+
+        /**
+         * List all APK files for a package (base + splits). Each Bundle has:
+         * fileName (String), path (String), size (long).
+         */
+        @NonNull
+        public static List<Bundle> listApkSplits(@NonNull String packageName) {
+            IBackupRestorePlus s = getService();
+            if (s == null) return java.util.Collections.emptyList();
+            try {
+                List<Bundle> r = s.listApkSplits(packageName);
+                return r != null ? r : java.util.Collections.emptyList();
+            }
+            catch (RemoteException e) { Log.w(TAG, "listApkSplits " + packageName, e); return java.util.Collections.emptyList(); }
+        }
+
+        /**
+         * Stream a specific APK split by file name (e.g. "base.apk",
+         * "split_config.arm64_v8a.apk"). Use listApkSplits() to get valid names.
+         */
+        @Nullable
+        public static ParcelFileDescriptor streamApkSplit(@NonNull String packageName, @NonNull String fileName) {
+            IBackupRestorePlus s = getService();
+            if (s == null) return null;
+            try { return s.streamApkSplit(packageName, fileName); }
+            catch (RemoteException e) { Log.w(TAG, "streamApkSplit " + packageName + "/" + fileName, e); return null; }
+        }
     }
 
     // ── ApkPatcher — temp-debug APK trick for non-root app data access ────────

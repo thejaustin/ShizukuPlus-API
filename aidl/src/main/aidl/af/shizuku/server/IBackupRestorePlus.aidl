@@ -207,4 +207,51 @@ interface IBackupRestorePlus {
      * Returns the count of settings successfully restored.
      */
     int restoreSettings(String namespace, in Bundle settings);
+
+    // ── OBB Data Backup / Restore ─────────────────────────────────────────────
+
+    /**
+     * Stream a gzip-compressed tar of /sdcard/Android/obb/<pkg>/.
+     * Required for games that store large expansion files in OBB directories.
+     * Shell has unrestricted access to external storage.
+     * Returns null if the OBB directory does not exist.
+     */
+    ParcelFileDescriptor backupObbData(String packageName);
+
+    /**
+     * Extract a gzip-compressed tar into /sdcard/Android/obb/<pkg>/.
+     * The directory is created if it doesn't exist.
+     * Returns false if extraction fails.
+     */
+    boolean restoreObbData(String packageName, in ParcelFileDescriptor tarStream);
+
+    // ── Detailed Package Metadata ─────────────────────────────────────────────
+
+    /**
+     * Return detailed metadata for a single package from 'pm dump <pkg>'.
+     * Bundle keys: versionName (String), versionCode (long), targetSdk (int),
+     * minSdk (int), uid (int), dataDir (String), nativeLibDir (String),
+     * isSystem (boolean), isDebuggable (boolean), allowBackup (boolean),
+     * firstInstallTime (String), lastUpdateTime (String).
+     * Returns an empty Bundle if the package is not installed.
+     */
+    Bundle getPackageMetadata(String packageName);
+
+    // ── Split APK Streaming ───────────────────────────────────────────────────
+
+    /**
+     * List all APK files for a package: base APK + all config splits.
+     * Bundle keys per entry: fileName (String), path (String), size (long).
+     * Use fileName with streamApkSplit() to stream each APK individually.
+     * This enables full split APK backup for cross-device restore.
+     */
+    List<Bundle> listApkSplits(String packageName);
+
+    /**
+     * Stream a specific APK by file name (e.g. "base.apk",
+     * "split_config.arm64_v8a.apk"). The fileName must be one of the names
+     * returned by listApkSplits() for this package — arbitrary paths are rejected.
+     * Returns null if the APK is not found or fileName is not valid for this package.
+     */
+    ParcelFileDescriptor streamApkSplit(String packageName, String fileName);
 }
