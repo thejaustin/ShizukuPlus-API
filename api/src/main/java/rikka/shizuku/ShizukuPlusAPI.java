@@ -1683,7 +1683,8 @@ public class ShizukuPlusAPI {
     public static class ApkPatcher {
 
         private static IApkPatcher getService() {
-            IShizukuService svc = getIShizukuServiceOrThrow();
+            IShizukuService svc = requirePlusService();
+            if (svc == null) return null;
             try { return svc.getApkPatcher(); }
             catch (RemoteException e) { Log.w(TAG, "getApkPatcher", e); return null; }
         }
