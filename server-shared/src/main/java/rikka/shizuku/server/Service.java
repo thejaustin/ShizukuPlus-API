@@ -376,13 +376,67 @@ public abstract class Service<
         try {
             process = Runtime.getRuntime().exec(cmd, env, dir != null ? new File(dir) : null);
         } catch (IOException e) {
-            throw new IllegalStateException(e.getMessage());
+            // Returning null here propagates as null on the client side, which crashes apps that
+            // don't null-check (aShell NPE on cl2.c, SamFonts, etc.). Return a dead-process stub
+            // so callers always get a non-null IRemoteProcess: waitFor() exits immediately with
+            // code 1, getErrorStream() carries the IOException message, and alive() is false.
+            LOGGER.w("newProcess: exec failed for %s: %s", Arrays.toString(cmd), e.getMessage());
+            return new FailedProcess(e.getMessage());
         }
 
         ClientRecord clientRecord = clientManager.findClient(Binder.getCallingUid(), Binder.getCallingPid());
         IBinder token = clientRecord != null ? clientRecord.client.asBinder() : null;
 
         return new RemoteProcessHolder(process, token);
+    }
+
+    private static final class FailedProcess extends IRemoteProcess.Stub {
+        private final byte[] errorBytes;
+
+        FailedProcess(String errorMessage) {
+            String msg = errorMessage != null ? errorMessage : "exec failed";
+            this.errorBytes = msg.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        }
+
+        @Override
+        public android.os.ParcelFileDescriptor getOutputStream() {
+            try {
+                return android.os.ParcelFileDescriptor.open(
+                        new File("/dev/null"), android.os.ParcelFileDescriptor.MODE_WRITE_ONLY);
+            } catch (IOException e) {
+                return null;
+            }
+        }
+
+        @Override
+        public android.os.ParcelFileDescriptor getInputStream() {
+            try {
+                return android.os.ParcelFileDescriptor.open(
+                        new File("/dev/null"), android.os.ParcelFileDescriptor.MODE_READ_ONLY);
+            } catch (IOException e) {
+                return null;
+            }
+        }
+
+        @Override
+        public android.os.ParcelFileDescriptor getErrorStream() {
+            try {
+                android.os.ParcelFileDescriptor[] pipe = android.os.ParcelFileDescriptor.createPipe();
+                try (java.io.OutputStream out =
+                             new android.os.ParcelFileDescriptor.AutoCloseOutputStream(pipe[1])) {
+                    out.write(errorBytes);
+                }
+                return pipe[0];
+            } catch (IOException e) {
+                return null;
+            }
+        }
+
+        @Override public int waitFor() { return 1; }
+        @Override public int exitValue() { return 1; }
+        @Override public void destroy() {}
+        @Override public boolean alive() { return false; }
+        @Override public boolean waitForTimeout(long timeout, String unitName) { return true; }
     }
 
     public boolean checkPlusFeatureEnabled(String key) {
