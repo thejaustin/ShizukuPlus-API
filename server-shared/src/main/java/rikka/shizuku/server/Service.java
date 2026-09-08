@@ -475,11 +475,15 @@ public abstract class Service<
                     reply.writeNoException();
                     reply.writeInt(getUid());
                     return true;
-                case 4: // checkPermission
+                case 4: // checkPermission (standard) or getUid (shifted/Swift Backup)
                     reply.writeNoException();
-                    reply.writeInt(checkPermission(data.readString()));
+                    if (data.dataAvail() > 0) {
+                        reply.writeInt(checkPermission(data.readString()));
+                    } else {
+                        reply.writeInt(getUid());
+                    }
                     return true;
-                case 7: // newProcess
+                case 7: // newProcess (standard)
                     String[] cmd = data.createStringArray();
                     String[] env = data.createStringArray();
                     String dir = data.readString();
@@ -487,23 +491,33 @@ public abstract class Service<
                     reply.writeNoException();
                     reply.writeStrongBinder(process != null ? process.asBinder() : null);
                     return true;
-                case 8: // getSELinuxContext
-                    reply.writeNoException();
-                    reply.writeString(getSELinuxContext());
+                case 8: // getSELinuxContext (standard) or newProcess (shifted/Swift Backup)
+                    if (data.dataAvail() > 0) {
+                        String[] cmd8 = data.createStringArray();
+                        String[] env8 = data.createStringArray();
+                        String dir8 = data.readString();
+                        IRemoteProcess process8 = newProcess(cmd8, env8, dir8);
+                        reply.writeNoException();
+                        reply.writeStrongBinder(process8 != null ? process8.asBinder() : null);
+                    } else {
+                        reply.writeNoException();
+                        reply.writeString(getSELinuxContext());
+                    }
                     return true;
             }
-            // v13+ codes: requestPermission (14) and attachApplication (17).
+            // v13+ codes: requestPermission (14) and attachApplication (17 standard, 18 shifted).
             // Previously in a dead else-branch: code 17 fell through to super.onTransact() with
             // data already past the interface token, causing enforceInterface() to read the binder
             // argument as a descriptor string and throw — leaving clientRecord null for all API
             // v13+ callers. That null record caused a 4-byte misalignment in transactRemote (flags
             // field skipped), forwarding malformed data to PM; IPackageManager.packageInstaller
             // returned null → NPE in installer apps (#406).
+            // Note: Swift Backup / legacy shifted AIDL clients invoke attachApplication with code 18.
             if (code == 14 /* requestPermission */) {
                 requestPermission(data.readInt());
                 reply.writeNoException();
                 return true;
-            } else if (code == 17 /* attachApplication v13+ */) {
+            } else if (code == 17 || code == 18 /* attachApplication v13+ (17) / shifted (18) */) {
                 IBinder binder = data.readStrongBinder();
                 Bundle args = data.readInt() != 0 ? Bundle.CREATOR.createFromParcel(data) : null;
                 attachApplication(IShizukuApplication.Stub.asInterface(binder), args);
