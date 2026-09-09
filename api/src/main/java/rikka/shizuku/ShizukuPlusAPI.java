@@ -724,7 +724,17 @@ public class ShizukuPlusAPI {
             try { return s.tarDirectory(dirPath, packageName); }
             catch (RemoteException e) { Log.w(TAG, "tarDirectory " + dirPath, e); return null; }
         }
+
+        /** Restore a tar archive stream into {@code destDirPath}. In ADB mode, uses run-as
+         *  {@code packageName} to restore directly as the app UID without requiring root chown. */
+        public static boolean restoreTarDirectory(@NonNull String destDirPath, @Nullable String packageName, @NonNull ParcelFileDescriptor tarPfd) {
+            IStorageProxy s = getService();
+            if (s == null) return false;
+            try { return s.restoreTarDirectory(destDirPath, packageName, tarPfd); }
+            catch (RemoteException e) { Log.w(TAG, "restoreTarDirectory " + destDirPath, e); return false; }
+        }
     }
+
 
     // -------------------------------------------------------------------------
     // Dhizuku — Device Owner compatibility

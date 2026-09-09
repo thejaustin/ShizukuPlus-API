@@ -55,4 +55,13 @@ interface IStorageProxy {
      * Returns a readable ParcelFileDescriptor to the tar stream, or null on failure.
      */
     ParcelFileDescriptor tarDirectory(String dirPath, String packageContext);
+
+    /**
+     * Restore a tar archive (optionally compressed) into destDirPath.
+     * If packageContext is non-null and the target is an app's /data/data or /data/user
+     * directory in ADB mode (UID 2000), uses run-as <packageContext> to extract directly
+     * into the app sandbox as the app UID, bypassing the need for root chown/SELinux fixes.
+     * Returns true on success, false on failure.
+     */
+    boolean restoreTarDirectory(String destDirPath, String packageContext, in ParcelFileDescriptor tarPfd);
 }
