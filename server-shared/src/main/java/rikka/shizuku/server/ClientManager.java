@@ -61,6 +61,30 @@ public class ClientManager<ConfigMgr extends ConfigManager> {
     public ClientRecord requireClient(int callingUid, int callingPid, boolean requiresPermission) {
         ClientRecord clientRecord = findClient(callingUid, callingPid);
         if (clientRecord == null) {
+            // Delivery-order guard for Android 14 consent race (#387):
+            // ShellConsentActivity can call deliverBinder() and hand the Shizuku binder to rish
+            // before the server finishes processing rish's attachApplication() call on its own
+            // Binder thread.  rish then immediately makes API calls (checkSelfPermission /
+            // requestPermission) that arrive here before the ClientRecord exists.
+            // Retry with exponential-ish back-off up to ~2 s total, matching the window used in
+            // ShellBinderRequestHandler.deliverBinder() for the frozen-process case.
+            final long[] retryDelaysMs = {50L, 100L, 100L, 200L, 200L, 300L, 500L};
+            for (long delayMs : retryDelaysMs) {
+                try {
+                    Thread.sleep(delayMs);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+                clientRecord = findClient(callingUid, callingPid);
+                if (clientRecord != null) {
+                    LOGGER.d("requireClient: uid %d pid %d attached after %d ms delay (Android 14 consent race)",
+                            callingUid, callingPid, delayMs);
+                    break;
+                }
+            }
+        }
+        if (clientRecord == null) {
             LOGGER.w("Caller (uid %d, pid %d) is not an attached client", callingUid, callingPid);
             throw new IllegalStateException("Not an attached client");
         }
