@@ -213,22 +213,63 @@ public class ShizukuProvider extends ContentProvider {
             return;
         }
 
-        BinderContainer container = extras.getParcelable(EXTRA_BINDER);
-        if (container == null) {
-            container = extras.getParcelable("rikka.shizuku.intent.extra.BINDER");
+        IBinder binder = null;
+        try {
+            binder = extras.getBinder("binder");
+        } catch (Throwable ignored) {
         }
-        
-        if (container != null && container.binder != null) {
+
+        if (binder == null) {
+            try {
+                extras.setClassLoader(BinderContainer.class.getClassLoader());
+            } catch (Throwable ignored) {
+            }
+
+            Object container = null;
+            try {
+                container = extras.getParcelable(EXTRA_BINDER);
+            } catch (Throwable ignored) {
+            }
+            if (container == null) {
+                try {
+                    container = extras.getParcelable("rikka.shizuku.intent.extra.BINDER");
+                } catch (Throwable ignored) {
+                }
+            }
+            if (container == null) {
+                try {
+                    container = extras.getParcelable("moe.shizuku.privileged.api.intent.extra.BINDER");
+                } catch (Throwable ignored) {
+                }
+            }
+
+            if (container != null) {
+                if (container instanceof IBinder) {
+                    binder = (IBinder) container;
+                } else {
+                    try {
+                        java.lang.reflect.Field field = container.getClass().getField("binder");
+                        binder = (IBinder) field.get(container);
+                    } catch (Throwable tr) {
+                        Log.w(TAG, "Failed to get binder from container", tr);
+                    }
+                }
+            }
+        }
+
+        if (binder != null && binder.pingBinder()) {
             Log.d(TAG, "binder received");
 
-            Shizuku.onBinderReceived(container.binder, getContext().getPackageName());
+            Shizuku.onBinderReceived(binder, getContext().getPackageName());
 
             if (enableMultiProcess) {
                 Log.d(TAG, "broadcast binder");
 
                 Intent intent = new Intent(ACTION_BINDER_RECEIVED)
-                        .putExtra(EXTRA_BINDER, container)
-                        .putExtra("rikka.shizuku.intent.extra.BINDER", container)
+                        .putExtra(EXTRA_BINDER, new BinderContainer(binder))
+                        .putExtra("rikka.shizuku.intent.extra.BINDER", new BinderContainer(binder))
+                        .putExtra("moe.shizuku.privileged.api.intent.extra.BINDER", new moe.shizuku.api.BinderContainer(binder))
+                        .putExtra("binder", binder)
                         .setPackage(getContext().getPackageName());
                 getContext().sendBroadcast(intent);
             }
@@ -245,6 +286,7 @@ public class ShizukuProvider extends ContentProvider {
         reply.putParcelable(EXTRA_BINDER, container);
         reply.putParcelable("rikka.shizuku.intent.extra.BINDER", new rikka.shizuku.BinderContainer(binder));
         reply.putParcelable("moe.shizuku.privileged.api.intent.extra.BINDER", new moe.shizuku.api.BinderContainer(binder));
+        reply.putBinder("binder", binder);
         return true;
     }
 
