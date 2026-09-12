@@ -47,6 +47,11 @@ public class ClientManager<ConfigMgr extends ConfigManager> {
                 return clientRecord;
             }
         }
+        for (ClientRecord clientRecord : clientRecords) {
+            if (clientRecord.uid == uid) {
+                return clientRecord;
+            }
+        }
         return null;
     }
 

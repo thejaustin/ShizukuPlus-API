@@ -150,7 +150,10 @@ public abstract class Service<
         int callingPid = Binder.getCallingPid();
         ClientRecord clientRecord = clientManager.findClient(callingUid, callingPid);
 
-        if (clientRecord != null && clientRecord.apiVersion >= 13) {
+        boolean isApi13 = (clientRecord != null && clientRecord.apiVersion >= 13)
+                || (clientRecord == null && flags == 0 && data.dataAvail() >= 4);
+
+        if (isApi13) {
             targetFlags = data.readInt();
         } else {
             targetFlags = flags;
@@ -320,7 +323,13 @@ public abstract class Service<
             return true;
         }
 
-        return clientManager.requireClient(callingUid, callingPid).allowed;
+        ClientRecord clientRecord = clientManager.findClient(callingUid, callingPid);
+        if (clientRecord != null) {
+            return clientRecord.allowed;
+        }
+
+        ConfigPackageEntry entry = configManager.find(callingUid);
+        return entry != null && entry.isAllowed();
     }
 
     @Override
@@ -360,8 +369,6 @@ public abstract class Service<
         if (callingUid == OsUtils.getUid() || callingPid == OsUtils.getPid()) {
             return true;
         }
-
-        clientManager.requireClient(callingUid, callingPid);
 
         ConfigPackageEntry entry = configManager.find(callingUid);
         return entry != null && entry.isDenied();
