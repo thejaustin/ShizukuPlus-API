@@ -265,11 +265,15 @@ public class ShizukuProvider extends ContentProvider {
             if (enableMultiProcess) {
                 Log.d(TAG, "broadcast binder");
 
+                // Bundle.putBinder is public API (API 18+); Intent.putExtra(String, IBinder)
+                // is hidden — use putExtras(bundle) to carry the raw binder instead.
+                Bundle rawBinder = new Bundle();
+                rawBinder.putBinder("binder", binder);
                 Intent intent = new Intent(ACTION_BINDER_RECEIVED)
                         .putExtra(EXTRA_BINDER, new BinderContainer(binder))
                         .putExtra("rikka.shizuku.intent.extra.BINDER", new BinderContainer(binder))
                         .putExtra("moe.shizuku.privileged.api.intent.extra.BINDER", new moe.shizuku.api.BinderContainer(binder))
-                        .putExtra("binder", binder)
+                        .putExtras(rawBinder)
                         .setPackage(getContext().getPackageName());
                 getContext().sendBroadcast(intent);
             }
