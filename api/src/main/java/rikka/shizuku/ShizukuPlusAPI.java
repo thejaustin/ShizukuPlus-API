@@ -313,6 +313,26 @@ public class ShizukuPlusAPI {
             }
             return false;
         }
+
+        /** [Ghost Bridge] Prepares an OverlayFS shadow mount for rootless system modification simulation. */
+        public static boolean prepareShadowMount(@NonNull String callingPackage, @NonNull String partition) {
+            IOverlayManagerPlus s = getService();
+            if (s != null) {
+                try { return s.prepareShadowMount(callingPackage, partition); }
+                catch (RemoteException e) { Log.w(TAG, "prepareShadowMount", e); }
+            }
+            return false;
+        }
+
+        /** [Samsung One UI 7+] Sets the active theme package via system settings. Pass null to clear. */
+        public static boolean setActiveThemePackage(@Nullable String packageName) {
+            IOverlayManagerPlus s = getService();
+            if (s != null) {
+                try { return s.setActiveThemePackage(packageName); }
+                catch (RemoteException e) { Log.w(TAG, "setActiveThemePackage " + packageName, e); }
+            }
+            return false;
+        }
     }
 
     // -------------------------------------------------------------------------
