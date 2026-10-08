@@ -306,7 +306,12 @@ public abstract class Service<
         } else {
             callingApiVersion = clientRecord.apiVersion;
         }
+        if (clientRecord != null) onClientEvent(clientRecord.packageName, "Bound user service");
         return userServiceManager.addUserService(conn, options, callingApiVersion);
+    }
+
+    /** Hook for subclasses to observe per-app IPC events (activity log). No-op by default. */
+    protected void onClientEvent(String packageName, String action) {
     }
 
     @Override
@@ -343,6 +348,7 @@ public abstract class Service<
         }
 
         ClientRecord clientRecord = clientManager.requireClient(callingUid, callingPid);
+        onClientEvent(clientRecord.packageName, "Requested permission");
 
         if (clientRecord.allowed) {
             clientRecord.dispatchRequestPermissionResult(requestCode, true);
