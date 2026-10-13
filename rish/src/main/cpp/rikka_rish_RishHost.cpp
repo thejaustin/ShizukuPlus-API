@@ -271,7 +271,7 @@ static jint RishHost_waitFor(JNIEnv *env, jclass clazz, jint pid) {
             return WEXITSTATUS(status);
         } else if (WIFSIGNALED(status)) {
             LOGD("killed by signal %d", WTERMSIG(status));
-            return 0;
+            return 128 + WTERMSIG(status);
         }
     } while (!WIFEXITED(status) && !WIFSIGNALED(status));
 

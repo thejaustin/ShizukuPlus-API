@@ -10,14 +10,14 @@ import android.util.Log;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 public abstract class RishService {
 
     private static final String TAG = "RishService";
 
-    private static final Map<Integer, RishHost> HOSTS = new HashMap<>();
+    private static final Map<Integer, RishHost> HOSTS = new ConcurrentHashMap<>();
 
     private static final boolean IS_ROOT = Os.getuid() == 0;
 
@@ -70,7 +70,7 @@ public abstract class RishService {
     private int getExitCode() {
         int callingPid = Binder.getCallingPid();
 
-        RishHost host = HOSTS.get(callingPid);
+        RishHost host = HOSTS.remove(callingPid);
         if (host == null) {
             Log.d(TAG, "Not existing host created by " + callingPid);
             return -1;

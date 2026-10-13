@@ -61,6 +61,7 @@ public class RishHost {
     private int pid;
     private int ptmx;
     private int exitCode = Integer.MAX_VALUE;
+    private Thread waitThread;
 
     public RishHost(
             String[] args, String[] env, String dir,
@@ -96,7 +97,8 @@ public class RishHost {
         pid = result[0];
         ptmx = result[1];
 
-        new Thread(() -> exitCode = waitFor(pid)).start();
+        waitThread = new Thread(() -> exitCode = waitFor(pid));
+        waitThread.start();
     }
 
     public int getPid() {
@@ -104,6 +106,11 @@ public class RishHost {
     }
 
     public int getExitCode() {
+        if (waitThread != null) {
+            try {
+                waitThread.join(2500);
+            } catch (InterruptedException ignored) {}
+        }
         return exitCode;
     }
 
