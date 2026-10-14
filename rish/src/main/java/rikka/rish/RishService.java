@@ -35,13 +35,15 @@ public abstract class RishService {
         // Under root, keep env unless RISH_PRESERVE_ENV=0 is set.
 
         boolean allowEnv = IS_ROOT;
-        for (String e : env) {
-            if ("RISH_PRESERVE_ENV=1".equals(e)) {
-                allowEnv = true;
-                break;
-            } else if ("RISH_PRESERVE_ENV=0".equals(e)) {
-                allowEnv = false;
-                break;
+        if (env != null) {
+            for (String e : env) {
+                if ("RISH_PRESERVE_ENV=1".equals(e)) {
+                    allowEnv = true;
+                    break;
+                } else if ("RISH_PRESERVE_ENV=0".equals(e)) {
+                    allowEnv = false;
+                    break;
+                }
             }
         }
         if (!allowEnv) {
