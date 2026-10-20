@@ -1,10 +1,10 @@
 package rikka.shizuku.server;
 
+import java.util.concurrent.CopyOnWriteArrayList;
 import android.os.IBinder;
 import android.os.RemoteException;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 import moe.shizuku.server.IShizukuApplication;
@@ -15,7 +15,11 @@ public class ClientManager<ConfigMgr extends ConfigManager> {
     protected static final Logger LOGGER = new Logger("UserServiceRecord");
 
     private final ConfigMgr configManager;
-    private final List<ClientRecord> clientRecords = Collections.synchronizedList(new ArrayList<>());
+    // Read on every binder call (findClient), written only on attach / binder death. A
+    // synchronizedList was iterated without its lock, so a client attaching or dying on another
+    // binder thread could throw ConcurrentModificationException mid-lookup; copy-on-write gives
+    // lock-free, always-consistent reads for this read-heavy pattern.
+    private final List<ClientRecord> clientRecords = new CopyOnWriteArrayList<>();
 
     public ClientManager(ConfigMgr configManager) {
         this.configManager = configManager;

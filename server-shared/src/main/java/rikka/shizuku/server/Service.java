@@ -1,5 +1,8 @@
 package rikka.shizuku.server;
 
+import java.util.WeakHashMap;
+import java.util.Collections;
+import java.util.Map;
 import android.os.Binder;
 import android.os.Bundle;
 import android.os.IBinder;
@@ -159,17 +162,24 @@ public abstract class Service<
             targetFlags = flags;
         }
 
-        String descriptor = targetBinder.getInterfaceDescriptor();
-        
+        // Every Shizuku API call goes through here. getInterfaceDescriptor() on a remote binder is
+        // a full extra IPC round-trip, so only resolve it when a feature that needs it is on, and
+        // cache it per binder (a binder's descriptor never changes).
+        boolean logging = checkPlusFeatureEnabled("binder_logging");
+        boolean firewall = checkPlusFeatureEnabled("binder_firewall");
+        boolean shadow = checkPlusFeatureEnabled("shadow_binder");
+        boolean profiler = checkPlusFeatureEnabled("binder_profiler");
+        String descriptor = (logging || firewall || shadow || profiler) ? descriptorOf(targetBinder) : null;
+
         // AIDL Logging (Issue #199)
-        if (checkPlusFeatureEnabled("binder_logging")) {
-            LOGGER.i("AIDL: uid=%d pkg=%s descriptor=%s code=%d", 
-                callingUid, (clientRecord != null ? clientRecord.packageName : "unknown"), 
+        if (logging) {
+            LOGGER.i("AIDL: uid=%d pkg=%s descriptor=%s code=%d",
+                callingUid, (clientRecord != null ? clientRecord.packageName : "unknown"),
                 descriptor, targetCode);
         }
 
         // Binder Firewall (Issue #199)
-        if (checkPlusFeatureEnabled("binder_firewall")) {
+        if (firewall) {
             if (isBinderCallBlocked(callingUid, descriptor, targetCode)) {
                 LOGGER.w("Firewall: Blocked transaction %s code %d from uid %d", descriptor, targetCode, callingUid);
                 throw new SecurityException("Binder Firewall: Transaction blocked by Shizuku+ policy");
@@ -177,7 +187,7 @@ public abstract class Service<
         }
 
         // Shadow Binder (Issue #199) - optional interception point
-        if (checkPlusFeatureEnabled("shadow_binder")) {
+        if (shadow) {
             if (handleShadowBinderTransaction(targetBinder, targetCode, data, reply, targetFlags)) {
                 return;
             }
@@ -188,21 +198,35 @@ public abstract class Service<
             newData.appendFrom(data, data.dataPosition(), data.dataAvail());
         } catch (Throwable tr) {
             LOGGER.w(tr, "appendFrom");
+            newData.recycle();
             return;
         }
-        
-        long startTime = System.nanoTime();
+
+        long startTime = profiler ? System.nanoTime() : 0L;
+        long id = Binder.clearCallingIdentity();
         try {
-            long id = Binder.clearCallingIdentity();
             targetBinder.transact(targetCode, newData, reply, targetFlags);
-            Binder.restoreCallingIdentity(id);
         } finally {
+            // Restore even if the target throws, so nothing after this runs as the server.
+            Binder.restoreCallingIdentity(id);
             newData.recycle();
-            long durationNs = System.nanoTime() - startTime;
-            if (checkPlusFeatureEnabled("binder_profiler")) {
-                recordTransactionMetrics(clientRecord, descriptor, targetCode, durationNs);
+            if (profiler) {
+                recordTransactionMetrics(clientRecord, descriptor, targetCode, System.nanoTime() - startTime);
             }
         }
+    }
+
+    // Identity-keyed (BinderProxy doesn't override equals) and weak, so dead binders drop out.
+    private final Map<IBinder, String> descriptorCache = Collections.synchronizedMap(new WeakHashMap<>());
+
+    /** Cached {@link IBinder#getInterfaceDescriptor()}; saves an IPC round-trip per call after the first. */
+    protected final String descriptorOf(IBinder binder) throws RemoteException {
+        String descriptor = descriptorCache.get(binder);
+        if (descriptor == null) {
+            descriptor = binder.getInterfaceDescriptor();
+            if (descriptor != null) descriptorCache.put(binder, descriptor);
+        }
+        return descriptor;
     }
 
     /**
