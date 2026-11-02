@@ -1033,8 +1033,10 @@ public class Shizuku {
                 reply.readException();
                 return reply.readInt() != 0;
             }
-        } catch (RemoteException e) {
-            // Not a Shizuku+ server or transaction failed
+        } catch (RemoteException | RuntimeException e) {
+            // Not a Shizuku+ server or transaction failed. Other Shizuku servers use these codes
+            // for their own calls and answer with e.g. a SecurityException (seen: "getShellOnly is
+            // allowed to be called only from the manager"); that means "not Shizuku+", not a crash.
         } finally {
             reply.recycle();
             data.recycle();
@@ -1058,8 +1060,8 @@ public class Shizuku {
                     reply.readException();
                     return reply.readStrongBinder();
                 }
-            } catch (RemoteException e) {
-                // Not a Shizuku+ server or transaction failed
+            } catch (RemoteException | RuntimeException e) {
+                // Not a Shizuku+ server, or it failed; same as isCustomApiEnabled() above.
             } finally {
                 reply.recycle();
                 data.recycle();
