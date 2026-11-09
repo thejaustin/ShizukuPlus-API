@@ -109,6 +109,13 @@ public abstract class UserServiceManager {
 
     private void removeUserServiceLocked(UserServiceRecord record) {
         if (userServiceRecords.values().remove(record)) {
+            List<UserServiceRecord> list = packageUserServiceRecords.get(record.packageName);
+            if (list != null) {
+                list.remove(record);
+                if (list.isEmpty()) {
+                    packageUserServiceRecords.remove(record.packageName);
+                }
+            }
             record.destroy();
             onUserServiceRecordRemoved(record);
         }

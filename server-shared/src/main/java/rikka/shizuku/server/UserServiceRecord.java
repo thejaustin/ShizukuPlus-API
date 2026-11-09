@@ -243,7 +243,11 @@ public abstract class UserServiceRecord {
         bindGeneration++;
 
         if (service != null) {
-            service.unlinkToDeath(deathRecipient, 0);
+            try {
+                service.unlinkToDeath(deathRecipient, 0);
+            } catch (Throwable ignored) {
+                // Thrown if the service has already died and was automatically unlinked by the kernel
+            }
         }
 
         if (service != null && service.pingBinder()) {

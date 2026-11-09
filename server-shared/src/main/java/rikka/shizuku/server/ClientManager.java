@@ -45,15 +45,25 @@ public class ClientManager<ConfigMgr extends ConfigManager> {
         }
     }
 
-    public ClientRecord findClient(int uid, int pid) {
+    public ClientRecord findClientExact(int uid, int pid) {
         for (ClientRecord clientRecord : clientRecords) {
             if (clientRecord.pid == pid && clientRecord.uid == uid) {
                 return clientRecord;
             }
         }
-        for (ClientRecord clientRecord : clientRecords) {
-            if (clientRecord.uid == uid) {
-                return clientRecord;
+        return null;
+    }
+
+    public ClientRecord findClient(int uid, int pid) {
+        ClientRecord exact = findClientExact(uid, pid);
+        if (exact != null) {
+            return exact;
+        }
+        if (pid <= 0) {
+            for (ClientRecord clientRecord : clientRecords) {
+                if (clientRecord.uid == uid) {
+                    return clientRecord;
+                }
             }
         }
         return null;
