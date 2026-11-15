@@ -61,6 +61,25 @@ public class ShizukuPlusAPI {
     }
 
     /**
+     * The sub-service only if it really is [descriptor]. An older or different server can hand back
+     * another interface at the same transaction code; calling into it throws "Binder invocation to
+     * an incorrect interface" (a SecurityException, not a RemoteException) in the client app.
+     */
+    @Nullable
+    private static <T extends android.os.IInterface> T checked(@Nullable T service, @NonNull String descriptor) {
+        if (service == null) return null;
+        try {
+            // Only a different, known descriptor is refused; a binder that reports none is trusted.
+            String actual = service.asBinder().getInterfaceDescriptor();
+            if (actual == null || actual.isEmpty() || descriptor.equals(actual)) return service;
+            Log.w(TAG, "Server returned " + actual + " for " + descriptor + "; is it an older Shizuku+?");
+        } catch (RemoteException | RuntimeException e) {
+            Log.w(TAG, "checked " + descriptor, e);
+        }
+        return null;
+    }
+
+    /**
      * Returns a live {@link IShizukuService} proxy, or {@code null} if
      * Shizuku is not connected or the binder has died.
      */
@@ -262,7 +281,7 @@ public class ShizukuPlusAPI {
         private static IOverlayManagerPlus getService() {
             IShizukuService svc = requirePlusService();
             if (svc == null) return null;
-            try { return svc.getOverlayManagerPlus(); }
+            try { return checked(svc.getOverlayManagerPlus(), "af.shizuku.server.IOverlayManagerPlus"); }
             catch (RemoteException e) { Log.w(TAG, "getOverlayManagerPlus", e); return null; }
         }
 
@@ -346,7 +365,7 @@ public class ShizukuPlusAPI {
         private static IActivityManagerPlus getService() {
             IShizukuService svc = requirePlusService();
             if (svc == null) return null;
-            try { return svc.getActivityManagerPlus(); }
+            try { return checked(svc.getActivityManagerPlus(), "af.shizuku.server.IActivityManagerPlus"); }
             catch (RemoteException e) { Log.w(TAG, "getActivityManagerPlus", e); return null; }
         }
 
@@ -385,7 +404,7 @@ public class ShizukuPlusAPI {
         private static IWindowManagerPlus getService() {
             IShizukuService svc = requirePlusService();
             if (svc == null) return null;
-            try { return svc.getWindowManagerPlus(); }
+            try { return checked(svc.getWindowManagerPlus(), "af.shizuku.server.IWindowManagerPlus"); }
             catch (RemoteException e) { Log.w(TAG, "getWindowManagerPlus", e); return null; }
         }
 
@@ -415,7 +434,7 @@ public class ShizukuPlusAPI {
         private static INetworkGovernorPlus getService() {
             IShizukuService svc = requirePlusService();
             if (svc == null) return null;
-            try { return svc.getNetworkGovernorPlus(); }
+            try { return checked(svc.getNetworkGovernorPlus(), "af.shizuku.server.INetworkGovernorPlus"); }
             catch (RemoteException e) { Log.w(TAG, "getNetworkGovernorPlus", e); return null; }
         }
 
@@ -452,7 +471,7 @@ public class ShizukuPlusAPI {
         private static IStatusBarGovernorPlus getService() {
             IShizukuService svc = requirePlusService();
             if (svc == null) return null;
-            try { return svc.getStatusBarGovernorPlus(); }
+            try { return checked(svc.getStatusBarGovernorPlus(), "af.shizuku.server.IStatusBarGovernorPlus"); }
             catch (RemoteException e) { Log.w(TAG, "getStatusBarGovernorPlus", e); return null; }
         }
 
@@ -546,7 +565,7 @@ public class ShizukuPlusAPI {
         private static IAICorePlus getService() {
             IShizukuService svc = requirePlusService();
             if (svc == null) return null;
-            try { return svc.getAICorePlus(); }
+            try { return checked(svc.getAICorePlus(), "af.shizuku.server.IAICorePlus"); }
             catch (RemoteException e) { Log.w(TAG, "getAICorePlus", e); return null; }
         }
 
@@ -622,7 +641,7 @@ public class ShizukuPlusAPI {
         private static IContinuityBridge getService() {
             IShizukuService svc = requirePlusService();
             if (svc == null) return null;
-            try { return svc.getContinuityBridge(); }
+            try { return checked(svc.getContinuityBridge(), "af.shizuku.server.IContinuityBridge"); }
             catch (RemoteException e) { Log.w(TAG, "getContinuityBridge", e); return null; }
         }
 
@@ -646,7 +665,7 @@ public class ShizukuPlusAPI {
         private static IVirtualMachineManager getService() {
             IShizukuService svc = requirePlusService();
             if (svc == null) return null;
-            try { return svc.getVirtualMachineManager(); }
+            try { return checked(svc.getVirtualMachineManager(), "af.shizuku.server.IVirtualMachineManager"); }
             catch (RemoteException e) { Log.w(TAG, "getVirtualMachineManager", e); return null; }
         }
 
@@ -706,7 +725,7 @@ public class ShizukuPlusAPI {
         private static IStorageProxy getService() {
             IShizukuService svc = requirePlusService();
             if (svc == null) return null;
-            try { return svc.getStorageProxy(); }
+            try { return checked(svc.getStorageProxy(), "af.shizuku.server.IStorageProxy"); }
             catch (RemoteException e) { Log.w(TAG, "getStorageProxy", e); return null; }
         }
 
@@ -816,7 +835,7 @@ public class ShizukuPlusAPI {
         private static IPackageGovernorPlus getService() {
             IShizukuService svc = requirePlusService();
             if (svc == null) return null;
-            try { return svc.getPackageGovernorPlus(); }
+            try { return checked(svc.getPackageGovernorPlus(), "af.shizuku.server.IPackageGovernorPlus"); }
             catch (RemoteException e) { Log.w(TAG, "getPackageGovernorPlus", e); return null; }
         }
 
@@ -928,7 +947,7 @@ public class ShizukuPlusAPI {
         private static IDisplayTunerPlus getService() {
             IShizukuService svc = requirePlusService();
             if (svc == null) return null;
-            try { return svc.getDisplayTunerPlus(); }
+            try { return checked(svc.getDisplayTunerPlus(), "af.shizuku.server.IDisplayTunerPlus"); }
             catch (RemoteException e) { Log.w(TAG, "getDisplayTunerPlus", e); return null; }
         }
 
@@ -993,7 +1012,7 @@ public class ShizukuPlusAPI {
         private static IAppInspector getService() {
             IShizukuService svc = requirePlusService();
             if (svc == null) return null;
-            try { return svc.getAppInspector(); }
+            try { return checked(svc.getAppInspector(), "af.shizuku.server.IAppInspector"); }
             catch (RemoteException e) { Log.w(TAG, "getAppInspector", e); return null; }
         }
 
@@ -1125,7 +1144,7 @@ public class ShizukuPlusAPI {
         private static IPrivilegedDataSource getService() {
             IShizukuService svc = requirePlusService();
             if (svc == null) return null;
-            try { return svc.getPrivilegedDataSource(); }
+            try { return checked(svc.getPrivilegedDataSource(), "af.shizuku.server.IPrivilegedDataSource"); }
             catch (RemoteException e) { Log.w(TAG, "getPrivilegedDataSource", e); return null; }
         }
 
@@ -1388,7 +1407,7 @@ public class ShizukuPlusAPI {
         private static IBackupRestorePlus getService() {
             IShizukuService svc = requirePlusService();
             if (svc == null) return null;
-            try { return svc.getBackupRestorePlus(); }
+            try { return checked(svc.getBackupRestorePlus(), "af.shizuku.server.IBackupRestorePlus"); }
             catch (RemoteException e) { Log.w(TAG, "getBackupRestorePlus", e); return null; }
         }
 
@@ -1754,7 +1773,7 @@ public class ShizukuPlusAPI {
         private static IApkPatcher getService() {
             IShizukuService svc = requirePlusService();
             if (svc == null) return null;
-            try { return svc.getApkPatcher(); }
+            try { return checked(svc.getApkPatcher(), "af.shizuku.server.IApkPatcher"); }
             catch (RemoteException e) { Log.w(TAG, "getApkPatcher", e); return null; }
         }
 
@@ -1842,7 +1861,7 @@ public class ShizukuPlusAPI {
         private static IDeviceControlPlus getService() {
             IShizukuService svc = requirePlusService();
             if (svc == null) return null;
-            try { return svc.getDeviceControlPlus(); }
+            try { return checked(svc.getDeviceControlPlus(), "af.shizuku.server.IDeviceControlPlus"); }
             catch (RemoteException e) { Log.w(TAG, "getDeviceControlPlus", e); return null; }
         }
 

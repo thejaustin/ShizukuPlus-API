@@ -103,16 +103,20 @@ public class ShizukuRemoteProcess extends Process implements Parcelable {
 
     @Override
     public void destroy() {
+        // Like Process.destroy(), never throws: a dead binder means the process (or the whole
+        // server) is already gone, which is what the caller wanted. Callers do this in finally.
         try {
             remote.destroy();
         } catch (RemoteException e) {
-            throw new RuntimeException(e);
+            Log.w(TAG, "destroy: remote process already gone", e);
         }
     }
 
     public boolean alive() {
         try {
             return remote.alive();
+        } catch (android.os.DeadObjectException e) {
+            return false;
         } catch (RemoteException e) {
             throw new RuntimeException(e);
         }
