@@ -1,6 +1,7 @@
 package rikka.shizuku;
 
 import android.os.Bundle;
+import android.hardware.HardwareBuffer;
 import android.os.IBinder;
 import android.os.ParcelFileDescriptor;
 import android.os.RemoteException;
@@ -29,6 +30,7 @@ import af.shizuku.server.IPrivilegedDataSource;
 import af.shizuku.server.IBackupRestorePlus;
 import af.shizuku.server.IApkPatcher;
 import af.shizuku.server.IDeviceControlPlus;
+import af.shizuku.server.ITaskManagerPlus;
 import moe.shizuku.server.IShizukuService;
 import af.shizuku.server.IStorageProxy;
 import af.shizuku.server.IVirtualMachineManager;
@@ -2020,6 +2022,67 @@ public class ShizukuPlusAPI {
             IDeviceControlPlus s = getService(); if (s == null) return null;
             try { return s.getSetting(namespace, key); }
             catch (RemoteException e) { Log.w(TAG, "getSetting", e); return null; }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Tasks — recent tasks, thumbnails, start from recents, remove
+    // -------------------------------------------------------------------------
+
+    /** Recent-tasks API for launchers and task switchers (requires the task_manager_plus feature). */
+    public static class Tasks {
+
+        /** Result key of getRecentTasks: int[] of task ids, newest first. */
+        public static final String KEY_TASK_IDS = "taskIds";
+        /** Result key of getRecentTasks: String[] of flattened ComponentNames, parallel to KEY_TASK_IDS. */
+        public static final String KEY_COMPONENTS = "components";
+        /** Result key of getTaskThumbnail: a HardwareBuffer the caller must close. */
+        public static final String KEY_BUFFER = "buffer";
+
+        @Nullable
+        private static ITaskManagerPlus getService() {
+            IShizukuService svc = requirePlusService();
+            if (svc == null) return null;
+            try { return checked(svc.getTaskManagerPlus(), "af.shizuku.server.ITaskManagerPlus"); }
+            catch (RemoteException e) { Log.w(TAG, "getTaskManagerPlus", e); return null; }
+        }
+
+        /** Recent tasks of the calling user as a Bundle (see KEY_*); empty if unavailable. */
+        @NonNull
+        public static Bundle getRecentTasks(int maxNum, int flags) {
+            ITaskManagerPlus s = getService();
+            if (s == null) return Bundle.EMPTY;
+            try {
+                Bundle b = s.getRecentTasks(maxNum, flags);
+                return b != null ? b : Bundle.EMPTY;
+            } catch (RemoteException e) { Log.w(TAG, "getRecentTasks", e); return Bundle.EMPTY; }
+        }
+
+        /** The task's screenshot, or null. The caller must close the returned buffer. */
+        @Nullable
+        public static HardwareBuffer getTaskThumbnail(int taskId) {
+            ITaskManagerPlus s = getService();
+            if (s == null) return null;
+            try {
+                Bundle b = s.getTaskThumbnail(taskId);
+                if (b == null) return null;
+                b.setClassLoader(HardwareBuffer.class.getClassLoader());
+                return b.getParcelable(KEY_BUFFER);
+            } catch (RemoteException | RuntimeException e) { Log.w(TAG, "getTaskThumbnail " + taskId, e); return null; }
+        }
+
+        public static boolean startTaskFromRecents(int taskId, @Nullable Bundle options) {
+            ITaskManagerPlus s = getService();
+            if (s == null) return false;
+            try { return s.startTaskFromRecents(taskId, options); }
+            catch (RemoteException e) { Log.w(TAG, "startTaskFromRecents " + taskId, e); return false; }
+        }
+
+        public static boolean removeTask(int taskId) {
+            ITaskManagerPlus s = getService();
+            if (s == null) return false;
+            try { return s.removeTask(taskId); }
+            catch (RemoteException e) { Log.w(TAG, "removeTask " + taskId, e); return false; }
         }
     }
 }

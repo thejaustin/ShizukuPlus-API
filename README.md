@@ -53,6 +53,22 @@ Advanced memory and process management.
 Seamless multi-device state synchronization.
 *   **Capabilities**: Sync app states and privileged task handoffs between devices running Shizuku+.
 
+### 9. Task Manager Plus (Recents)
+Read and control the recent-tasks list, for launchers and replacement recents screens.
+*   **Capabilities**: List recent tasks, read task thumbnails, bring a task to the front, remove a task.
+*   **Feature flag**: `task_manager_plus` (on by default); scope: `activity_manager`.
+*   **Bundle keys**: `Tasks.KEY_TASK_IDS` (`int[]`), `Tasks.KEY_COMPONENTS` (`String[]`, parallel), `Tasks.KEY_BUFFER` (`HardwareBuffer`).
+
+```java
+Bundle recents = ShizukuPlusAPI.Tasks.getRecentTasks(20, 0);
+int[] ids = recents.getIntArray(ShizukuPlusAPI.Tasks.KEY_TASK_IDS);
+String[] components = recents.getStringArray(ShizukuPlusAPI.Tasks.KEY_COMPONENTS);
+if (ids != null && ids.length > 0) {
+    HardwareBuffer thumb = ShizukuPlusAPI.Tasks.getTaskThumbnail(ids[0]); // close() when done
+    ShizukuPlusAPI.Tasks.startTaskFromRecents(ids[0], null);
+}
+```
+
 ## 🚀 Getting Started
 
 ### Add dependency
